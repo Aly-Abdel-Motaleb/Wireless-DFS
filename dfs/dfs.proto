@@ -41,8 +41,8 @@ message HeartbeatRequest {
 }
 
 message NotifyFileStoredRequest {
-    string id = 1;
-    string fileName = 2;
+    int32 fileId = 1;
+    string dataKeeperIp = 2;
     string filePath = 3;
 }
 
