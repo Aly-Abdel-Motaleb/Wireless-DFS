@@ -1,7 +1,10 @@
 package main
 
+import (
+	"DFS/master/db"
+)
+
 func main() {
-	for i := 0; i < 10; i++ {
-		println(i)
-	}
+	db.InitDb()
+
 }

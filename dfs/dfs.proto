@@ -8,9 +8,6 @@ option go_package = ".";
 service masterTracker {
     rpc requestUpload (UploadRequest) returns (UploadResponse);
     rpc requestDownload (DownloadRequest) returns (DownloadResponse);
-
-    
-    
     rpc heartbeat (HeartbeatRequest) returns (Ack);
     rpc notifyFileStored (NotifyFileStoredRequest) returns (Ack);
 }
