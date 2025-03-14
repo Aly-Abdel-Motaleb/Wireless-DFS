@@ -41,9 +41,11 @@ message HeartbeatRequest {
 }
 
 message NotifyFileStoredRequest {
-    int32 fileId = 1;
-    string dataKeeperIp = 2;
+    string dataKeeperIp = 1;
+    string dataKeeperPort = 2;
     string filePath = 3;
+    string fileName = 4;
+    bool type = 5;
 }
 
 message ReplicateFileRequest {
@@ -52,6 +54,7 @@ message ReplicateFileRequest {
     string destinationIp = 3;
     int32 destinationPort = 4;
 }
+
     
 
 message Ack {

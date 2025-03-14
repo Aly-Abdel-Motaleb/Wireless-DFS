@@ -1,4 +1,4 @@
-package main
+package tcp
 
 import (
 	"encoding/binary"
@@ -18,8 +18,8 @@ type FileServer struct {
 	wg sync.WaitGroup
 }
 
-func (fs *FileServer) start() error {
-	ln, err := net.Listen("tcp", ":3000")
+func (fs *FileServer) Start(port string) error {
+	ln, err := net.Listen("tcp", port)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (fs *FileServer) readLoop(conn net.Conn) {
 	fmt.Printf("Received %d/%d bytes into %s\n", received, fileSize, filename)
 }
 
-func sendFile(path string) error {
+func SendFile(path, ip, port string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -123,13 +123,15 @@ func sendFile(path string) error {
 	filenameBytes := []byte(filename)
 	filenameLen := int64(len(filenameBytes))
 
+
+
 	fi, err := file.Stat()
 	if err != nil {
 		return err
 	}
 	fileSize := fi.Size()
 
-	conn, err := net.Dial("tcp", "localhost:3000")
+	conn, err := net.Dial("tcp", ip+":"+port)
 	if err != nil {
 		return err
 	}
@@ -183,14 +185,14 @@ func sendFile(path string) error {
 	return nil
 }
 
-func main() {
+func tcp() {
 	startTime := time.Now()
 	fs := &FileServer{}
 	serverDone := make(chan error)
 
 	// Start server in a goroutine
 	go func() {
-		serverDone <- fs.start()
+		serverDone <- fs.Start("3000")
 	}()
 
 	// Give the server a moment to start
@@ -201,7 +203,7 @@ func main() {
 		var path string
 		fmt.Print("Enter file path to send: ")
 		fmt.Scan(&path)
-		if err := sendFile(path); err != nil {
+		if err := SendFile(path, "localhost", "3000"); err != nil {
 			log.Fatal("Send file error:", err)
 		}
 		// Stop the server after sending
