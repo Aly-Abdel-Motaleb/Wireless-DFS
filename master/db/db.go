@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -23,7 +24,7 @@ func InitDb() {
 
 func createTables() {
 	filesTable := `
-	CREATE TABLE files IF NOT EXISTS (
+	CREATE TABLE IF NOT EXISTS files (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		filename TEXT NOT NULL UNIQUE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -31,8 +32,8 @@ func createTables() {
 	`
 
 	dataKeeperTable := `
-	CREATE TABLE datakeepers IF NOT EXISTS (
-		id TEXT PRIMARY KEY AUTOINCREMENT,
+	CREATE TABLE IF NOT EXISTS datakeepers (
+		id TEXT PRIMARY KEY,
 		ip TEXT NOT NULL,
 		port INTEGER NOT NULL,
 		last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -41,7 +42,7 @@ func createTables() {
 	`
 
 	matchesTable := `
-	CREATE TABLE filelocations IF NOT EXISTS (
+	CREATE TABLE IF NOT EXISTS file_locations (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		file_id INTEGER NOT NULL,
 		data_keeper_id TEXT NOT NULL,
@@ -68,7 +69,7 @@ func createTables() {
 func createIndices() {
 	statement := `
 	CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);
-	CREATE INDEX IF NOT EXISTS idx_data_keepers_ip_port ON data_keepers(ip, port);
+	CREATE INDEX IF NOT EXISTS idx_data_keepers_ip_port ON datakeepers(ip, port);
 	CREATE INDEX IF NOT EXISTS idx_file_locations_file ON file_locations(file_id);
 	`
 
