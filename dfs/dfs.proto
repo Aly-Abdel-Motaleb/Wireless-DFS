@@ -45,7 +45,7 @@ message NotifyFileStoredRequest {
     string dataKeeperPort = 2;
     string filePath = 3;
     string fileName = 4;
-    bool type = 5;
+    bool replication = 5; // false upload, true replicate
 }
 
 message ReplicateFileRequest {
