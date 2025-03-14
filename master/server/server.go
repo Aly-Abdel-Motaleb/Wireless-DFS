@@ -15,7 +15,7 @@ func NewMasterServer() *MasterServer {
 	return &MasterServer{}
 }
 
-func (s *MasterServer) requestUpload(req *pb.UploadRequest) (*pb.UploadResponse, error) {
+func (s *MasterServer) requestUpload(ctx context.Context, req *pb.UploadRequest) (*pb.UploadResponse, error) {
 	query := `
 	SELECT dk.ip, dk.port, COUNT(fl.file_id) AS file_count
 	FROM datakeepers dk
