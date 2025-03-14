@@ -41,11 +41,10 @@ message HeartbeatRequest {
 }
 
 message NotifyFileStoredRequest {
-    string dataKeeperIp = 1;
-    string dataKeeperPort = 2;
-    string filePath = 3;
-    string fileName = 4;
-    bool replication = 5; // false upload, true replicate
+    string datakeeperId = 1;
+    string filePath = 2;
+    string fileName = 3;
+    bool replication = 4; // false upload, true replicate
 }
 
 message ReplicateFileRequest {
