@@ -18,8 +18,9 @@ type FileServer struct {
 	wg sync.WaitGroup
 }
 
-func (fs *FileServer) Start(port string) error {
+func (fs *FileServer) Start(port string, ch chan<- string) error {
 	ln, err := net.Listen("tcp", port)
+
 	if err != nil {
 		return err
 	}
@@ -39,7 +40,7 @@ func (fs *FileServer) Start(port string) error {
 		fs.wg.Add(1)
 		go func(c net.Conn) {
 			defer fs.wg.Done()
-			fs.readLoop(c)
+			fs.readLoop(c, ch)
 		}(conn)
 	}
 }
@@ -50,7 +51,7 @@ func (fs *FileServer) stop() {
 	}
 }
 
-func (fs *FileServer) readLoop(conn net.Conn) {
+func (fs *FileServer) readLoop(conn net.Conn, ch chan<- string) {
 	defer conn.Close()
 
 	var filenameLen int64
@@ -111,6 +112,7 @@ func (fs *FileServer) readLoop(conn net.Conn) {
 	}
 
 	fmt.Printf("Received %d/%d bytes into %s\n", received, fileSize, filename)
+	ch <- filename
 }
 
 func SendFile(path, ip, port string) error {
@@ -122,8 +124,6 @@ func SendFile(path, ip, port string) error {
 	filename := filepath.Base(path)
 	filenameBytes := []byte(filename)
 	filenameLen := int64(len(filenameBytes))
-
-
 
 	fi, err := file.Stat()
 	if err != nil {
@@ -185,35 +185,35 @@ func SendFile(path, ip, port string) error {
 	return nil
 }
 
-func tcp() {
-	startTime := time.Now()
-	fs := &FileServer{}
-	serverDone := make(chan error)
+// func tcp() {
+// 	startTime := time.Now()
+// 	fs := &FileServer{}
+// 	serverDone := make(chan error)
 
-	// Start server in a goroutine
-	go func() {
-		serverDone <- fs.Start("3000")
-	}()
+// 	// Start server in a goroutine
+// 	go func() {
+// 		serverDone <- fs.Start("3000")
+// 	}()
 
-	// Give the server a moment to start
-	time.Sleep(100 * time.Millisecond)
+// 	// Give the server a moment to start
+// 	time.Sleep(100 * time.Millisecond)
 
-	// Client part
-	go func() {
-		var path string
-		fmt.Print("Enter file path to send: ")
-		fmt.Scan(&path)
-		if err := SendFile(path, "localhost", "3000"); err != nil {
-			log.Fatal("Send file error:", err)
-		}
-		// Stop the server after sending
-		fs.stop()
-	}()
+// 	// Client part
+// 	go func() {
+// 		var path string
+// 		fmt.Print("Enter file path to send: ")
+// 		fmt.Scan(&path)
+// 		if err := SendFile(path, "localhost", "3000"); err != nil {
+// 			log.Fatal("Send file error:", err)
+// 		}
+// 		// Stop the server after sending
+// 		fs.stop()
+// 	}()
 
-	// Wait for the server to finish
-	if err := <-serverDone; err != nil {
-		log.Fatal("Server error:", err)
-	}
+// 	// Wait for the server to finish
+// 	if err := <-serverDone; err != nil {
+// 		log.Fatal("Server error:", err)
+// 	}
 
-	fmt.Printf("Time taken: %v\n", time.Since(startTime))
-}
+// 	fmt.Printf("Time taken: %v\n", time.Since(startTime))
+// }
