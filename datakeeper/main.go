@@ -1,100 +1,58 @@
 package main
 
-// message ReplicateFileRequest {
-//     string fileName = 1;
-//     string filePath = 2;
-//     string destinationIp = 3;
-//     int32 destinationPort = 4;
-// }
-
-// service dataKeeper {
-//     rpc replicateFile (ReplicateFileRequest) returns (Ack);
-// }
 import (
+	"DFS/datakeeper/server"
 	pb "DFS/dfs"
-	tcp "DFS/tcp"
-	"context"
+	"flag"
 	"log"
-	"strconv"
+	"net"
+	"regexp"
+	"time"
 
 	"google.golang.org/grpc"
 )
 
-type DataKeeper struct {
-	pb.UnimplementedDataKeeperServer
-	id   string
-	ip   string
-	port string
-}
+func main() {
 
-func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileRequest) *pb.Ack {
-	// Replicate file to destination
-	// in.FileName
+	id := flag.String("i", "1", "Datakeeper ID")
+	ip := flag.String("ip", "localhost", "Datakeeper IP")
+	port := flag.String("p", "50052", "Datakeeper Port")
+	MasterAddr := flag.String("m", "localhost:50051", "Master Address")
 
-	error := tcp.SendFile(in.FilePath, in.DestinationIp, string(in.DestinationPort))
+	flag.Parse()
 
-	if error != nil {
-		return &pb.Ack{Success: false, Message: "Failed to replicate file"}
+	ipRegex := `\b((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b|\b(?:localhost)\b`
+	matched, err := regexp.MatchString(ipRegex, *ip)
+	if err != nil || !matched {
+		log.Fatalf("invalid IP address: %v", *ip)
 	}
 
-	return &pb.Ack{Success: true, Message: "File replicated successfully"}
-}
+	if *ip == "" || *port == "" {
+		log.Fatalf("IP address and port must not be empty")
+	}
 
-func (dk *DataKeeper) UploadFile(ctx context.Context) {
-	// listen to upload request
-	// save file to disk
-	// send notifyfilestored to master
-	fs := &tcp.FileServer{}
-	serverDone := make(chan error)
-	ch := make(chan string)
-	// listen to the upload request
-	// if upload request has been received then save the file to disk
-	// send notifyfilestored to master
+	lis, err := net.Listen("tcp", *ip+":"+*port)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	grpc_server := grpc.NewServer()
+
+	dk := server.NewDataKeeperServer(*id, *ip, *port, *MasterAddr)
+
+	pb.RegisterDataKeeperServer(grpc_server, dk)
+
+	log.Println("Starting Datakeeper Server on " + *ip + ":" + *port)
 
 	go func() {
-		serverDone <- fs.Start(dk.port, ch)
+		for {
+			dk.Heartbeat()
+			time.Sleep(5 * time.Second)
+		}
 	}()
 
-	uploadErr := <-serverDone
-	if uploadErr != nil {
-		log.Fatal("Upload file error:", uploadErr)
-	}
-	// send notifyfilestored to master
-	filename := <-ch
-	request := &pb.NotifyFileStoredRequest{
-		DatakeeperId: dk.id,
-		FilePath:     "./" + filename,
-		FileName:     filename,
-		Replication:  false,
-	}
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithBlock())
+	err = grpc_server.Serve(lis)
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("failed to serve: %v", err)
 	}
-	defer conn.Close()
-	client := pb.NewMasterTrackerClient(conn)
-	_, err = client.NotifyFileStored(context.Background(), request)
-
-}
-
-func (dk *DataKeeper) Heartbeat(ctx context.Context) {
-	// send heartbeat to master
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	client := pb.NewMasterTrackerClient(conn)
-	port, err := strconv.ParseInt(dk.port, 10, 32)
-	if err != nil {
-		log.Fatalf("failed to convert port to int32: %v", err)
-	}
-	request := &pb.HeartbeatRequest{
-		Id:   dk.id,
-		Ip:   dk.ip,
-		Port: int32(port),
-	}
-
-	_, err = client.Heartbeat(context.Background(), request)
-
 }

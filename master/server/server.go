@@ -5,6 +5,9 @@ import (
 	"DFS/master/db"
 	"context"
 	"errors"
+	"log"
+
+	"google.golang.org/grpc"
 )
 
 type MasterServer struct {
@@ -25,59 +28,72 @@ func (s *MasterServer) requestUpload(ctx context.Context, req *pb.UploadRequest)
 	LIMIT 1;`
 
 	var ip string
-	var port int32
+	var port string
 	err := db.DB.QueryRow(query).Scan(&ip, &port)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.UploadResponse{Ip: ip, Port: port}, nil
+	conn, err := grpc.Dial(ip+":"+port, grpc.WithInsecure())
+	if err != nil {
+		log.Printf("Failed to dial datakeeper: %v", err)
+	}
+	defer conn.Close()
+	client := pb.NewDataKeeperClient(conn)
+	request := &pb.DatakeeperRequest{}
+	dkResponse, err := client.RequestUpload(context.Background(), request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.UploadResponse{Ip: dkResponse.Ip, Port: dkResponse.Port}, nil
 }
 
 func (s *MasterServer) requestDownload(ctx context.Context, req *pb.DownloadRequest) (*pb.DownloadResponse, error) {
-	query := `
-	SELECT dk.ip, dk.port
-	FROM datakeepers dk
-	JOIN file_locations fl ON dk.id = fl.data_keeper_id
-	JOIN files f ON fl.file_id = f.id
-	WHERE f.filename = ?;
-	`
+	// query := `
+	// SELECT dk.ip, dk.port
+	// FROM datakeepers dk
+	// JOIN file_locations fl ON dk.id = fl.data_keeper_id
+	// JOIN files f ON fl.file_id = f.id
+	// WHERE f.filename = ?;
+	// `
 
-	rows, err := db.DB.Query(query, req.FileName)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	// rows, err := db.DB.Query(query, req.FileName)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer rows.Close()
 
-	var ips []string
-	var ports []int32
-	for rows.Next() {
-		var ip string
-		var port int32
-		err := rows.Scan(&ip, &port)
-		if err != nil {
-			return nil, err
-		}
-		ips = append(ips, ip)
-		ports = append(ports, port)
-	}
-	if len(ips) > 0 {
-		return &pb.DownloadResponse{Ips: ips, Ports: ports}, nil
-	}
+	// var ips []string
+	// var ports []int32
+	// for rows.Next() {
+	// 	var ip string
+	// 	var port int32
+	// 	err := rows.Scan(&ip, &port)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	ips = append(ips, ip)
+	// 	ports = append(ports, port)
+	// }
+	// if len(ips) > 0 {
+	// 	return &pb.DownloadResponse{Ips: ips, Ports: ports}, nil
+	// }
 	return nil, errors.New("File not found")
 }
 
-func (s *MasterServer) heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.Ack, error) {
+func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.Ack, error) {
 	query := `
-	INSERT OR REPLACE INTO data_keepers (ip, port, last_heartbeat, is_alive)
-	VALUES (?, ?, CURRENT_TIMESTAMP, 1);
-	`
+    INSERT OR REPLACE INTO datakeepers (id, ip, port, last_heartbeat, is_alive)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1);
+    `
 
-	_, err := db.DB.Exec(query, req.Ip, req.Port)
+	_, err := db.DB.Exec(query, req.Id, req.Ip, req.Port)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Printf("Heartbeat received from datakeeper %s from %s:%s", req.Id, req.Ip, req.Port)
 	return &pb.Ack{Success: true, Message: "Heartbeat received"}, nil
 }
 

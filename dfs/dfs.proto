@@ -1,5 +1,8 @@
 syntax = "proto3";
 
+
+// protoc --go_out=. --go-grpc_out=. dfs.proto
+
 package dfs;
 
 option go_package = ".";
@@ -13,7 +16,11 @@ service masterTracker {
 }
 
 service dataKeeper {
+    rpc requestUpload (datakeeperRequest) returns (UploadResponse);
     rpc replicateFile (ReplicateFileRequest) returns (Ack);
+}
+
+message datakeeperRequest {
 }
 
 message UploadRequest {
@@ -22,7 +29,7 @@ message UploadRequest {
 
 message UploadResponse {
     string ip = 1;
-    int32 port = 2;
+    string port = 2;
 }
 
 message DownloadRequest {
@@ -31,13 +38,13 @@ message DownloadRequest {
 
 message DownloadResponse {
     repeated string ips = 1;
-    repeated int32 ports = 2;
+    repeated string ports = 2;
 }
 
 message HeartbeatRequest {
     string id = 1;
-    string ip = 2; 
-    int32 port = 3;
+    string ip = 2;
+    string port = 3;
 }
 
 message NotifyFileStoredRequest {
@@ -51,10 +58,8 @@ message ReplicateFileRequest {
     string fileName = 1;
     string filePath = 2;
     string destinationIp = 3;
-    int32 destinationPort = 4;
+    string destinationPort = 4;
 }
-
-    
 
 message Ack {
     bool success = 1;

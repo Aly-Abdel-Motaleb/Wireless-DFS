@@ -35,7 +35,7 @@ func createTables() {
 	CREATE TABLE IF NOT EXISTS datakeepers (
 		id TEXT PRIMARY KEY,
 		ip TEXT NOT NULL,
-		port INTEGER NOT NULL,
+		port TEXT NOT NULL,
 		last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP,
 		is_alive BOOLEAN DEFAULT 1
 	);

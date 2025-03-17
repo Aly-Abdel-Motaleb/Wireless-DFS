@@ -10,14 +10,25 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 )
 
 type FileServer struct {
-	ln net.Listener
-	wg sync.WaitGroup
+	ln net.Listener   // TCP listener
+	wg sync.WaitGroup // WaitGroup to wait for all goroutines to finish
 }
 
+// Start starts the file server on the specified port.
+// It listens for incoming TCP connections and reads files from them.
+// Upon successful completion of reading a file, it sends the filename to the provided channel.
+//
+// Args:
+//
+//	port (string): The port number to listen on.
+//	ch (chan<- string): The channel to send the filename to upon successful completion.
+//
+// Returns:
+//
+//	error: An error if any occurs during the file server operation, otherwise nil.
 func (fs *FileServer) Start(port string, ch chan<- string) error {
 	ln, err := net.Listen("tcp", port)
 
@@ -45,12 +56,32 @@ func (fs *FileServer) Start(port string, ch chan<- string) error {
 	}
 }
 
+// stops the file server by closing the listener and waiting for all
 func (fs *FileServer) stop() {
 	if fs.ln != nil {
 		fs.ln.Close()
 	}
 }
 
+// readLoop reads a file from a TCP connection and saves it to the local filesystem.
+// It also sends a confirmation message back to the client and sends the filename
+// to the provided channel upon successful completion.
+//
+// Args:
+//
+//	conn (net.Conn): The TCP connection from which to read the file.
+//	ch (chan<- string): The channel to send the filename to upon successful completion.
+//
+// The function performs the following steps:
+// 1. Reads the length of the filename from the connection.
+// 2. Reads the filename from the connection.
+// 3. Reads the size of the file from the connection.
+// 4. Creates a new file with the received filename.
+// 5. Reads the file data from the connection and writes it to the created file.
+// 6. Sends a confirmation message ("OK") back to the client.
+// 7. Sends the filename to the provided channel.
+//
+// If any error occurs during these steps, the function logs the error and returns early.
 func (fs *FileServer) readLoop(conn net.Conn, ch chan<- string) {
 	defer conn.Close()
 
@@ -115,6 +146,16 @@ func (fs *FileServer) readLoop(conn net.Conn, ch chan<- string) {
 	ch <- filename
 }
 
+// SendFile sends a file over a TCP connection to the specified IP and port.
+// It sends the filename, file size, and file content, and waits for a confirmation from the server.
+//
+// Parameters:
+//   - path: The path to the file to be sent.
+//   - ip: The IP address of the server to send the file to.
+//   - port: The port number of the server to send the file to.
+//
+// Returns:
+//   - error: An error if any occurs during the file sending process, otherwise nil.
 func SendFile(path, ip, port string) error {
 	file, err := os.Open(path)
 	if err != nil {

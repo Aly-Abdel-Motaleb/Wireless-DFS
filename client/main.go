@@ -29,8 +29,6 @@ func main() {
 	switch command {
 	case "upload":
 		uploadFile(filePath)
-	case "download":
-		downloadFile(filePath)
 	default:
 		fmt.Println("Unknown command. Use 'upload' or 'download'.")
 	}
@@ -89,57 +87,57 @@ func sendFileToDataKeeper(ip string, port int32, fileName string) error {
 	return nil
 }
 
-func downloadFile(fileName string) {
-	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
-	if err != nil {
-		fmt.Println("Failed to connect to Master Tracker:", err)
-		return
-	}
-	defer conn.Close()
+// func downloadFile(fileName string) {
+// 	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
+// 	if err != nil {
+// 		fmt.Println("Failed to connect to Master Tracker:", err)
+// 		return
+// 	}
+// 	defer conn.Close()
 
-	client := pb.MasterTrackerClient(conn)
+// 	client := pb.MasterTrackerClient(conn)
 
-	// Request available Data Keeper nodes for the file
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	resp, err := client.GetDownloadNodes(ctx, &pb.DownloadRequest{FileName: fileName})
-	if err != nil {
-		fmt.Println("Failed to get Data Keeper nodes:", err)
-		return
-	}
+// 	// Request available Data Keeper nodes for the file
+// 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+// 	defer cancel()
+// 	resp, err := client.GetDownloadNodes(ctx, &pb.DownloadRequest{FileName: fileName})
+// 	if err != nil {
+// 		fmt.Println("Failed to get Data Keeper nodes:", err)
+// 		return
+// 	}
 
-	// Try downloading from the first available node
-	for _, node := range resp.Nodes {
-		fmt.Println("Attempting download from:", node.Ip, node.Port)
-		err = receiveFileFromDataKeeper(node.Ip, node.Port, fileName)
-		if err == nil {
-			fmt.Println("Download successful!")
-			return
-		}
-		fmt.Println("Failed to download from", node.Ip, "Trying next node...")
-	}
+// 	// Try downloading from the first available node
+// 	for _, node := range resp.Nodes {
+// 		fmt.Println("Attempting download from:", node.Ip, node.Port)
+// 		err = receiveFileFromDataKeeper(node.Ip, node.Port, fileName)
+// 		if err == nil {
+// 			fmt.Println("Download successful!")
+// 			return
+// 		}
+// 		fmt.Println("Failed to download from", node.Ip, "Trying next node...")
+// 	}
 
-	fmt.Println("Download failed from all nodes.")
-}
+// 	fmt.Println("Download failed from all nodes.")
+// }
 
-// Receive file from Data Keeper via TCP
-func receiveFileFromDataKeeper(ip string, port int32, fileName string) error {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		return fmt.Errorf("failed to connect to Data Keeper: %v", err)
-	}
-	defer conn.Close()
+// // Receive file from Data Keeper via TCP
+// func receiveFileFromDataKeeper(ip string, port int32, fileName string) error {
+// 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
+// 	if err != nil {
+// 		return fmt.Errorf("failed to connect to Data Keeper: %v", err)
+// 	}
+// 	defer conn.Close()
 
-	file, err := os.Create(fileName)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %v", err)
-	}
-	defer file.Close()
+// 	file, err := os.Create(fileName)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create file: %v", err)
+// 	}
+// 	defer file.Close()
 
-	_, err = io.Copy(file, conn)
-	if err != nil {
-		return fmt.Errorf("failed to receive file: %v", err)
-	}
+// 	_, err = io.Copy(file, conn)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to receive file: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
