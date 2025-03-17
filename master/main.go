@@ -4,6 +4,7 @@ import (
 	"DFS/master/db"
 	"log"
 	"net"
+	"time"
 
 	pb "DFS/dfs"
 	"DFS/master/server"
@@ -20,12 +21,19 @@ func main() {
 	}
 
 	grpc_server := grpc.NewServer()
-	pb.RegisterMasterTrackerServer(grpc_server, server.NewMasterServer())
+	masterServer := server.NewMasterServer()
+	pb.RegisterMasterTrackerServer(grpc_server, masterServer)
 
 	log.Println("Starting Master Server on localhost:50051")
+
+	go func() {
+		masterServer.UpdateDataKeepersAliveStatus()
+		time.Sleep(5 * time.Second)
+	}()
 
 	err = grpc_server.Serve(lis)
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+
 }

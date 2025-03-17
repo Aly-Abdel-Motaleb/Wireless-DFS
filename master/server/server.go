@@ -92,8 +92,8 @@ func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) 
 	if err != nil {
 		return nil, err
 	}
-
 	log.Printf("Heartbeat received from datakeeper %s from %s:%s", req.Id, req.Ip, req.Port)
+
 	return &pb.Ack{Success: true, Message: "Heartbeat received"}, nil
 }
 
@@ -130,4 +130,12 @@ func (s *MasterServer) notifyFileStored(ctx context.Context, req *pb.NotifyFileS
 	}
 
 	return nil, nil
+}
+
+func (s *MasterServer) UpdateDataKeepersAliveStatus() {
+	_, err := db.DB.Exec("UPDATE datakeepers SET is_alive = 0 where last_heartbeat < datetime('now', '-10 seconds');")
+	if err != nil {
+		log.Printf("Cannot update datakeepers alive status: %v", err)
+		log.Fatal("Cannot update datakeepers alive status")
+	}
 }
