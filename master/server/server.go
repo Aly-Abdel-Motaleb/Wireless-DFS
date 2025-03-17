@@ -23,6 +23,7 @@ func (s *MasterServer) RequestUpload(ctx context.Context, req *pb.UploadRequest)
     SELECT dk.ip, dk.port, COUNT(fl.file_id) AS file_count
     FROM datakeepers dk
     LEFT JOIN file_locations fl ON dk.id = fl.data_keeper_id
+	WHERE dk.is_alive = 1
     GROUP BY dk.id
     ORDER BY file_count ASC
     LIMIT 1;`
@@ -97,7 +98,7 @@ func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) 
 	return &pb.Ack{Success: true, Message: "Heartbeat received"}, nil
 }
 
-func (s *MasterServer) notifyFileStored(ctx context.Context, req *pb.NotifyFileStoredRequest) (*pb.Ack, error) {
+func (s *MasterServer) NotifyFileStored(ctx context.Context, req *pb.NotifyFileStoredRequest) (*pb.Ack, error) {
 	// based on wether it's a replication or upload request
 	// if replication request, search for file id
 	// if upload request, insert file into files table

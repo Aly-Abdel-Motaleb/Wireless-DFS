@@ -19,11 +19,16 @@ type FileDetails struct {
 type FileServer struct {
 	ln net.Listener // TCP listener
 	// wg sync.WaitGroup // WaitGroup to wait for all goroutines to finish
-	ch chan FileDetails
+	ch             chan FileDetails
+	OnFileReceived func(FileDetails)
 }
 
 func NewFileServer() *FileServer {
 	return &FileServer{}
+}
+
+func (fs *FileServer) SetOnReceive(f func(FileDetails)) {
+	fs.OnFileReceived = f
 }
 
 // Start starts the file server by listening on a random port.
@@ -42,7 +47,7 @@ func (fs *FileServer) Start() (port string, err error) {
 		return "", fmt.Errorf("listen error: %w", err)
 	}
 	fs.ln = ln
-	fs.ch = make(chan FileDetails)
+	fs.ch = make(chan FileDetails, 1)
 	// defer ln.Close()
 
 	return port, nil
@@ -56,7 +61,7 @@ func (fs *FileServer) stop() {
 }
 
 func (fs *FileServer) WaitOnConnections() (err error) {
-	exitChannel := make(chan struct{})
+	exitChannel := make(chan bool, 1)
 	for {
 		conn, err := fs.ln.Accept()
 		if err != nil {
@@ -71,13 +76,16 @@ func (fs *FileServer) WaitOnConnections() (err error) {
 			// go func(c net.Conn) {
 			// 	defer fs.wg.Done()
 			fs.readLoop(conn, exitChannel)
+			val, _ := <-exitChannel
+			if val {
+				log.Printf("Closing server\n")
+				for filedetail := range fs.ch {
+					fs.OnFileReceived(filedetail)
+				}
+				fs.stop()
+				return nil
+			}
 			// }(conn)
-		}
-
-		_, ok := <-exitChannel
-		if !ok {
-			fs.stop()
-			return nil
 		}
 	}
 }
@@ -101,7 +109,7 @@ func (fs *FileServer) WaitOnConnections() (err error) {
 // 7. Sends the filename to the provided channel.
 //
 // If any error occurs during these steps, the function logs the error and returns early.
-func (fs *FileServer) readLoop(conn net.Conn, exit chan struct{}) {
+func (fs *FileServer) readLoop(conn net.Conn, exit chan bool) {
 	defer conn.Close()
 
 	var filenameLen int64
@@ -165,7 +173,7 @@ func (fs *FileServer) readLoop(conn net.Conn, exit chan struct{}) {
 	fileDetails := FileDetails{FileName: filename}
 
 	fs.ch <- fileDetails
-	exit <- struct{}{}
+	exit <- true
 	close(exit)
 }
 

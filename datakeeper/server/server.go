@@ -43,6 +43,25 @@ func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperReques
 	}
 	go fileServer.WaitOnConnections()
 
+	go fileServer.SetOnReceive(func(filedetails tcp.FileDetails) {
+		request := &pb.NotifyFileStoredRequest{
+			DatakeeperId: dk.id,
+			FilePath:     filedetails.FileName,
+			FileName:     filedetails.FileName,
+			Replication:  false,
+		}
+		conn, err := grpc.Dial(dk.masterAddr, grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("did not connect: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewMasterTrackerClient(conn)
+		_, err = client.NotifyFileStored(context.Background(), request)
+		if err != nil {
+			log.Fatalf("Failed to send notify file stored: %v", err)
+		}
+	})
+
 	return &pb.UploadResponse{Ip: dk.ip, Port: port}, nil
 }
 

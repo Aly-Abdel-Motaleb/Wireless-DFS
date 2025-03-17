@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"time"
 
 	pb "DFS/dfs" // Replace with actual proto package path
 	"DFS/tcp"
@@ -45,9 +44,7 @@ func uploadFile(filePath string) {
 	client := pb.NewMasterTrackerClient(conn)
 
 	// Request an available Data Keeper node
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	resp, err := client.RequestUpload(ctx, &pb.UploadRequest{FileName: filePath})
+	resp, err := client.RequestUpload(context.Background(), &pb.UploadRequest{FileName: filePath})
 
 	if err != nil {
 		fmt.Println("Failed to get Data Keeper node:", err)
