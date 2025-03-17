@@ -9,57 +9,76 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
+	"strconv"
 )
 
-type FileServer struct {
-	ln net.Listener   // TCP listener
-	wg sync.WaitGroup // WaitGroup to wait for all goroutines to finish
+type FileDetails struct {
+	FileName string
 }
 
-// Start starts the file server on the specified port.
-// It listens for incoming TCP connections and reads files from them.
-// Upon successful completion of reading a file, it sends the filename to the provided channel.
-//
+type FileServer struct {
+	ln net.Listener // TCP listener
+	// wg sync.WaitGroup // WaitGroup to wait for all goroutines to finish
+	ch chan FileDetails
+}
+
+func NewFileServer() *FileServer {
+	return &FileServer{}
+}
+
+// Start starts the file server by listening on a random port.
+// It returns the port number and an error if any occurs during the process.
 // Args:
-//
-//	port (string): The port number to listen on.
-//	ch (chan<- string): The channel to send the filename to upon successful completion.
+//   - None
 //
 // Returns:
-//
-//	error: An error if any occurs during the file server operation, otherwise nil.
-func (fs *FileServer) Start(port string, ch chan<- string) error {
-	ln, err := net.Listen("tcp", port)
+//   - port (string): The port number the server is listening on.
+//   - error: An error if any occurs during the process, otherwise nil.
+func (fs *FileServer) Start() (port string, err error) {
+	ln, err := net.Listen("tcp", ":0")
+	port = strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
 
 	if err != nil {
-		return err
+		return "", fmt.Errorf("listen error: %w", err)
 	}
 	fs.ln = ln
-	defer ln.Close()
+	fs.ch = make(chan FileDetails)
+	// defer ln.Close()
 
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			var opErr *net.OpError
-			if errors.As(err, &opErr) && opErr.Err.Error() == "use of closed network connection" {
-				fs.wg.Wait()
-				return nil
-			}
-			return fmt.Errorf("accept error: %w", err)
-		}
-		fs.wg.Add(1)
-		go func(c net.Conn) {
-			defer fs.wg.Done()
-			fs.readLoop(c, ch)
-		}(conn)
-	}
+	return port, nil
 }
 
 // stops the file server by closing the listener and waiting for all
 func (fs *FileServer) stop() {
 	if fs.ln != nil {
 		fs.ln.Close()
+	}
+}
+
+func (fs *FileServer) WaitOnConnections() (err error) {
+	exitChannel := make(chan struct{})
+	for {
+		conn, err := fs.ln.Accept()
+		if err != nil {
+			var opErr *net.OpError
+			if errors.As(err, &opErr) && opErr.Err.Error() == "use of closed network connection" {
+				// fs.wg.Wait()
+				return nil
+			}
+			return fmt.Errorf("accept error: %w", err)
+		} else {
+			// fs.wg.Add(1)
+			// go func(c net.Conn) {
+			// 	defer fs.wg.Done()
+			fs.readLoop(conn, exitChannel)
+			// }(conn)
+		}
+
+		_, ok := <-exitChannel
+		if !ok {
+			fs.stop()
+			return nil
+		}
 	}
 }
 
@@ -82,7 +101,7 @@ func (fs *FileServer) stop() {
 // 7. Sends the filename to the provided channel.
 //
 // If any error occurs during these steps, the function logs the error and returns early.
-func (fs *FileServer) readLoop(conn net.Conn, ch chan<- string) {
+func (fs *FileServer) readLoop(conn net.Conn, exit chan struct{}) {
 	defer conn.Close()
 
 	var filenameLen int64
@@ -143,7 +162,11 @@ func (fs *FileServer) readLoop(conn net.Conn, ch chan<- string) {
 	}
 
 	fmt.Printf("Received %d/%d bytes into %s\n", received, fileSize, filename)
-	ch <- filename
+	fileDetails := FileDetails{FileName: filename}
+
+	fs.ch <- fileDetails
+	exit <- struct{}{}
+	close(exit)
 }
 
 // SendFile sends a file over a TCP connection to the specified IP and port.
@@ -223,6 +246,7 @@ func SendFile(path, ip, port string) error {
 	}
 
 	fmt.Printf("Sent %d/%d bytes of %s\n", sent, fileSize, filename)
+
 	return nil
 }
 

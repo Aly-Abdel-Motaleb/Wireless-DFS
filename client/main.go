@@ -18,20 +18,20 @@ import (
 const masterTrackerAddr = "localhost:50051"
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: client upload/download <file.mp4>")
-		return
-	}
+	// if len(os.Args) < 3 {
+	// 	fmt.Println("Usage: client upload/download <file.mp4>")
+	// 	return
+	// }
 
-	command := os.Args[1]
-	filePath := os.Args[2]
+	// command := os.Args[1]
+	// filePath := os.Args[2]
 
-	switch command {
-	case "upload":
-		uploadFile(filePath)
-	default:
-		fmt.Println("Unknown command. Use 'upload' or 'download'.")
-	}
+	// switch command {
+	// case "upload":
+	uploadFile("main")
+	// default:
+	// 	fmt.Println("Unknown command. Use 'upload' or 'download'.")
+	// }
 }
 
 func uploadFile(filePath string) {
@@ -56,7 +56,7 @@ func uploadFile(filePath string) {
 
 	fmt.Println("Uploading to Data Keeper at:", resp.Ip, resp.Port)
 
-	err = tcp.SendFile(filePath, resp.Ip, string(resp.Port))
+	err = tcp.SendFile(filePath, resp.Ip, resp.Port)
 	if err != nil {
 		fmt.Println("File upload failed:", err)
 		return

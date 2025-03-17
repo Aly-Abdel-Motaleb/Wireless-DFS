@@ -35,28 +35,15 @@ func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileReq
 	return &pb.Ack{Success: true, Message: "File replicated successfully"}, nil
 }
 
-func (dk *DataKeeper) requestUpload(ctx context.Context, in *pb.DatakeeperRequest) (*pb.UploadResponse, error) {
-
-	// listen to upload request
-	// save file to disk
-	// send notifyfilestored to master
-	fs := &tcp.FileServer{}
-	serverDone := make(chan error)
-	ch := make(chan string)
-	// listen to the upload request
-	// if upload request has been received then save the file to disk
-	// send notifyfilestored to master
-
-	go func() {
-		serverDone <- fs.Start("9000", ch)
-	}()
-
-	uploadErr := <-serverDone
-	if uploadErr != nil {
-		return nil, uploadErr
+func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperRequest) (*pb.UploadResponse, error) {
+	fileServer := tcp.NewFileServer()
+	port, err := fileServer.Start() // port and error
+	if err != nil {
+		return nil, err
 	}
+	go fileServer.WaitOnConnections()
 
-	return &pb.UploadResponse{Ip: dk.ip, Port: "9000"}, nil
+	return &pb.UploadResponse{Ip: dk.ip, Port: port}, nil
 }
 
 // func (dk *DataKeeper) UploadFile(ctx context.Context) {

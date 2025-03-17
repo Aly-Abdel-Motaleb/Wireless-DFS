@@ -18,18 +18,19 @@ func NewMasterServer() *MasterServer {
 	return &MasterServer{}
 }
 
-func (s *MasterServer) requestUpload(ctx context.Context, req *pb.UploadRequest) (*pb.UploadResponse, error) {
+func (s *MasterServer) RequestUpload(ctx context.Context, req *pb.UploadRequest) (*pb.UploadResponse, error) {
 	query := `
-	SELECT dk.ip, dk.port, COUNT(fl.file_id) AS file_count
-	FROM datakeepers dk
-	LEFT JOIN file_locations fl ON dk.id = fl.data_keeper_id
-	GROUP BY dk.id
-	ORDER BY file_count ASC
-	LIMIT 1;`
+    SELECT dk.ip, dk.port, COUNT(fl.file_id) AS file_count
+    FROM datakeepers dk
+    LEFT JOIN file_locations fl ON dk.id = fl.data_keeper_id
+    GROUP BY dk.id
+    ORDER BY file_count ASC
+    LIMIT 1;`
 
 	var ip string
 	var port string
-	err := db.DB.QueryRow(query).Scan(&ip, &port)
+	var fileCount int
+	err := db.DB.QueryRow(query).Scan(&ip, &port, &fileCount)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,6 @@ func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) 
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Heartbeat received from datakeeper %s from %s:%s", req.Id, req.Ip, req.Port)
 
 	return &pb.Ack{Success: true, Message: "Heartbeat received"}, nil
 }
