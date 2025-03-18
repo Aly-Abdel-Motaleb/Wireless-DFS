@@ -27,8 +27,10 @@ func main() {
 	log.Println("Starting Master Server on localhost:50051")
 
 	go func() {
-		masterServer.UpdateDataKeepersAliveStatus()
-		time.Sleep(5 * time.Second)
+		for {
+			masterServer.UpdateDataKeepersAliveStatus()
+			time.Sleep(5 * time.Second)
+		}
 	}()
 
 	err = grpc_server.Serve(lis)

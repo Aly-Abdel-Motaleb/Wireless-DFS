@@ -16,15 +16,24 @@ type FileDetails struct {
 	FileName string
 }
 
+func NewFileDetails(filename string) *FileDetails {
+	return &FileDetails{FileName: filename}
+}
+
 type FileServer struct {
 	ln net.Listener // TCP listener
 	// wg sync.WaitGroup // WaitGroup to wait for all goroutines to finish
 	ch             chan FileDetails
 	OnFileReceived func(FileDetails)
+	FileDetails    FileDetails
 }
 
 func NewFileServer() *FileServer {
 	return &FileServer{}
+}
+
+func (fs *FileServer) SetFileDetails(filedetails FileDetails) {
+	fs.FileDetails = filedetails
 }
 
 func (fs *FileServer) SetOnReceive(f func(FileDetails)) {
@@ -53,6 +62,15 @@ func (fs *FileServer) Start() (port string, err error) {
 	return port, nil
 }
 
+func (fs *FileServer) StartOnPort(ip, port string) (err error) {
+	ln, err := net.Listen("tcp", ip+":"+port)
+	if err != nil {
+		return fmt.Errorf("listen error: %w", err)
+	}
+	fs.ln = ln
+	return nil
+}
+
 // stops the file server by closing the listener and waiting for all
 func (fs *FileServer) stop() {
 	if fs.ln != nil {
@@ -60,7 +78,7 @@ func (fs *FileServer) stop() {
 	}
 }
 
-func (fs *FileServer) WaitOnConnections() (err error) {
+func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 	exitChannel := make(chan bool, 1)
 	for {
 		conn, err := fs.ln.Accept()
@@ -75,7 +93,16 @@ func (fs *FileServer) WaitOnConnections() (err error) {
 			// fs.wg.Add(1)
 			// go func(c net.Conn) {
 			// 	defer fs.wg.Done()
-			fs.readLoop(conn, exitChannel)
+			if download {
+				tcpaddr, ok := conn.RemoteAddr().(*net.TCPAddr)
+				if !ok {
+					log.Println("Error getting remote address")
+					return errors.New("we are fucked up!")
+				}
+				SendFile(fs.FileDetails.FileName, conn.RemoteAddr().String(), strconv.Itoa(tcpaddr.Port))
+			} else {
+				fs.readLoop(conn, exitChannel)
+			}
 			val, _ := <-exitChannel
 			if val {
 				log.Printf("Closing server\n")

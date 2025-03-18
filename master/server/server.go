@@ -51,37 +51,37 @@ func (s *MasterServer) RequestUpload(ctx context.Context, req *pb.UploadRequest)
 	return &pb.UploadResponse{Ip: dkResponse.Ip, Port: dkResponse.Port}, nil
 }
 
-func (s *MasterServer) requestDownload(ctx context.Context, req *pb.DownloadRequest) (*pb.DownloadResponse, error) {
-	// query := `
-	// SELECT dk.ip, dk.port
-	// FROM datakeepers dk
-	// JOIN file_locations fl ON dk.id = fl.data_keeper_id
-	// JOIN files f ON fl.file_id = f.id
-	// WHERE f.filename = ?;
-	// `
+func (s *MasterServer) RequestDownload(ctx context.Context, req *pb.DownloadRequest) (*pb.DownloadResponse, error) {
+	query := `
+	SELECT dk.ip, dk.port
+	FROM datakeepers dk
+	JOIN file_locations fl ON dk.id = fl.data_keeper_id
+	JOIN files f ON fl.file_id = f.id
+	WHERE f.filename = ? AND dk.is_alive = 1;
+	`
 
-	// rows, err := db.DB.Query(query, req.FileName)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// defer rows.Close()
+	rows, err := db.DB.Query(query, req.FileName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	// var ips []string
-	// var ports []int32
-	// for rows.Next() {
-	// 	var ip string
-	// 	var port int32
-	// 	err := rows.Scan(&ip, &port)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	ips = append(ips, ip)
-	// 	ports = append(ports, port)
-	// }
-	// if len(ips) > 0 {
-	// 	return &pb.DownloadResponse{Ips: ips, Ports: ports}, nil
-	// }
-	return nil, errors.New("File not found")
+	var ips []string
+	var ports []string
+	for rows.Next() {
+		var ip string
+		var port string
+		err := rows.Scan(&ip, &port)
+		if err != nil {
+			return nil, err
+		}
+		ips = append(ips, ip)
+		ports = append(ports, port)
+	}
+	if len(ips) > 0 {
+		return &pb.DownloadResponse{Ips: ips, Ports: ports}, nil
+	}
+	return nil, errors.New("file not found")
 }
 
 func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.Ack, error) {

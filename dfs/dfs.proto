@@ -18,6 +18,7 @@ service masterTracker {
 service dataKeeper {
     rpc requestUpload (datakeeperRequest) returns (UploadResponse);
     rpc replicateFile (ReplicateFileRequest) returns (Ack);
+    rpc requestDownload (DownloadRequest) returns (DataKeeperDownloadResponse);
 }
 
 message datakeeperRequest {
@@ -39,6 +40,11 @@ message DownloadRequest {
 message DownloadResponse {
     repeated string ips = 1;
     repeated string ports = 2;
+}
+
+message DataKeeperDownloadResponse {
+    string ip = 1;
+    string port = 2;
 }
 
 message HeartbeatRequest {

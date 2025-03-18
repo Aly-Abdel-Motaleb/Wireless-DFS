@@ -41,9 +41,9 @@ func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperReques
 	if err != nil {
 		return nil, err
 	}
-	go fileServer.WaitOnConnections()
+	go fileServer.WaitOnConnections(false)
 
-	go fileServer.SetOnReceive(func(filedetails tcp.FileDetails) {
+	fileServer.SetOnReceive(func(filedetails tcp.FileDetails) {
 		request := &pb.NotifyFileStoredRequest{
 			DatakeeperId: dk.id,
 			FilePath:     filedetails.FileName,
@@ -121,4 +121,17 @@ func (dk *DataKeeper) Heartbeat() {
 		log.Fatalf("Failed to send heartbeat: %v", err)
 		os.Exit(1)
 	}
+}
+
+func (dk *DataKeeper) RequestDownload(ctx context.Context, in *pb.DownloadRequest) (*pb.DataKeeperDownloadResponse, error) {
+	fileServer := tcp.NewFileServer()
+	fileServer.SetFileDetails(*tcp.NewFileDetails(in.FileName))
+	port, err := fileServer.Start() // port and error
+	if err != nil {
+		return nil, err
+	}
+
+	go fileServer.WaitOnConnections(true)
+
+	return &pb.DataKeeperDownloadResponse{Ip: dk.ip, Port: port}, nil
 }

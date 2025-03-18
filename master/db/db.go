@@ -26,7 +26,7 @@ func createTables() {
 	filesTable := `
 	CREATE TABLE IF NOT EXISTS files (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		filename TEXT NOT NULL UNIQUE,
+		filename TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
