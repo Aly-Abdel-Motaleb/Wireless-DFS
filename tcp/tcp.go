@@ -256,7 +256,6 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 	err = os.Remove(tempFilePath)
 
 	fileDetails := NewFileDetails(filename, &hash, &path, &fileSize)
-	fmt.Printf("%v\n", fileDetails)
 
 	ch <- *fileDetails
 	exit <- true
