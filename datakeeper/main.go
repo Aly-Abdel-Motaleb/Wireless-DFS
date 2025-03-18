@@ -4,8 +4,10 @@ import (
 	"DFS/datakeeper/server"
 	pb "DFS/dfs"
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"regexp"
 	"time"
 
@@ -31,6 +33,11 @@ func main() {
 		log.Fatalf("IP address and port must not be empty")
 	}
 
+	err = os.Mkdir(fmt.Sprintf("datakeeper_%s", *id), 0755)
+	if err != nil && !os.IsExist(err) {
+		log.Printf("Failed to create directory: %v", err)
+	}
+
 	lis, err := net.Listen("tcp", *ip+":"+*port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -53,6 +60,6 @@ func main() {
 
 	err = grpc_server.Serve(lis)
 	if err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Printf("Failed to serve: %v", err)
 	}
 }

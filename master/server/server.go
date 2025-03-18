@@ -5,6 +5,7 @@ import (
 	"DFS/master/db"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 
 	"google.golang.org/grpc"
@@ -53,7 +54,7 @@ func (s *MasterServer) RequestUpload(ctx context.Context, req *pb.UploadRequest)
 
 func (s *MasterServer) RequestDownload(ctx context.Context, req *pb.DownloadRequest) (*pb.DownloadResponse, error) {
 	query := `
-	SELECT dk.ip, dk.port
+	SELECT dk.id, dk.ip, dk.port
 	FROM datakeepers dk
 	JOIN file_locations fl ON dk.id = fl.data_keeper_id
 	JOIN files f ON fl.file_id = f.id
@@ -66,15 +67,18 @@ func (s *MasterServer) RequestDownload(ctx context.Context, req *pb.DownloadRequ
 	}
 	defer rows.Close()
 
+	var ids []string
 	var ips []string
 	var ports []string
 	for rows.Next() {
+		var id string
 		var ip string
 		var port string
-		err := rows.Scan(&ip, &port)
+		err := rows.Scan(&id, &ip, &port)
 		if err != nil {
 			return nil, err
 		}
+		ids = append(ids, id)
 		ips = append(ips, ip)
 		ports = append(ports, port)
 	}
@@ -96,7 +100,7 @@ func (s *MasterServer) RequestDownload(ctx context.Context, req *pb.DownloadRequ
 		}
 		downloadPorts = append(downloadPorts, resp.Port)
 	}
-	return &pb.DownloadResponse{Ips: ips, Ports: downloadPorts}, nil
+	return &pb.DownloadResponse{Ids: ids, Ips: ips, Ports: downloadPorts}, nil
 }
 
 func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.Ack, error) {
@@ -118,34 +122,43 @@ func (s *MasterServer) NotifyFileStored(ctx context.Context, req *pb.NotifyFileS
 	// if replication request, search for file id
 	// if upload request, insert file into files table
 
+	if db.DoesFileExistByHash(req.FileHash, req.DatakeeperId) {
+		response := &pb.Ack{Success: false, Message: "File already exists", ErrorCode: pb.ErrorCode_FILE_ALREADY_EXISTS}
+		return response, nil
+	}
+
 	var id int
 	if req.Replication {
 		query := `SELECT id FROM files WHERE filename = ?;`
 		err := db.DB.QueryRow(query, req.FileName).Scan(&id)
 		if err != nil {
-			return nil, err
+			return &pb.Ack{Success: false, Message: fmt.Sprintf("File not found: %v", err), ErrorCode: pb.ErrorCode_FILE_NOT_FOUND},
+				nil
 		}
 	} else {
-		query := `INSERT INTO files (filename) VALUES (?);`
-		res, err := db.DB.Exec(query, req.FileName)
+		query := `INSERT INTO files (filename, hash) VALUES (?, ?);`
+		res, err := db.DB.Exec(query, req.FileName, req.FileHash)
 		if err != nil {
 			return nil, err
 		}
 		id64, err := res.LastInsertId()
 		if err != nil {
-			return nil, err
+			return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to get file id: %v", err), ErrorCode: pb.ErrorCode_FETAL_ERROR},
+				nil
 		}
 		id = int(id64)
 	}
 
 	query := `INSERT INTO file_locations (file_id, data_keeper_id, filepath) VALUES (?, ?, ?);`
 
+	log.Printf("path %s", req.FilePath)
 	_, err := db.DB.Exec(query, id, req.DatakeeperId, req.FilePath)
 	if err != nil {
-		return nil, err
+		return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to store file location: %v", err), ErrorCode: pb.ErrorCode_FETAL_ERROR},
+			nil
 	}
 
-	return nil, nil
+	return &pb.Ack{Success: true, Message: "File stored"}, nil
 }
 
 func (s *MasterServer) UpdateDataKeepersAliveStatus() {

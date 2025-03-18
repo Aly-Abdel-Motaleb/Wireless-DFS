@@ -35,73 +35,6 @@ func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileReq
 	return nil, nil
 }
 
-func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperRequest) (*pb.UploadResponse, error) {
-	fileServer := tcp.NewFileServer()
-	port, err := fileServer.Start() // port and error
-	if err != nil {
-		return nil, err
-	}
-	go fileServer.WaitOnConnections(false)
-
-	fileServer.SetOnReceive(func(filedetails tcp.FileDetails) {
-		request := &pb.NotifyFileStoredRequest{
-			DatakeeperId: dk.id,
-			FilePath:     filedetails.FileName,
-			FileName:     filedetails.FileName,
-			Replication:  false,
-		}
-		conn, err := grpc.Dial(dk.masterAddr, grpc.WithInsecure())
-		if err != nil {
-			log.Fatalf("did not connect: %v", err)
-		}
-		defer conn.Close()
-		client := pb.NewMasterTrackerClient(conn)
-		_, err = client.NotifyFileStored(context.Background(), request)
-		if err != nil {
-			log.Fatalf("Failed to send notify file stored: %v", err)
-		}
-	})
-
-	return &pb.UploadResponse{Ip: dk.ip, Port: port}, nil
-}
-
-// func (dk *DataKeeper) UploadFile(ctx context.Context) {
-// 	// listen to upload request
-// 	// save file to disk
-// 	// send notifyfilestored to master
-// 	fs := &tcp.FileServer{}
-// 	serverDone := make(chan error)
-// 	ch := make(chan string)
-// 	// listen to the upload request
-// 	// if upload request has been received then save the file to disk
-// 	// send notifyfilestored to master
-
-// 	go func() {
-// 		serverDone <- fs.Start(dk.port, ch)
-// 	}()
-
-// 	uploadErr := <-serverDone
-// 	if uploadErr != nil {
-// 		log.Fatal("Upload file error:", uploadErr)
-// 	}
-// 	// send notifyfilestored to master
-// 	filename := <-ch
-// 	request := &pb.NotifyFileStoredRequest{
-// 		DatakeeperId: dk.id,
-// 		FilePath:     "./" + filename,
-// 		FileName:     filename,
-// 		Replication:  false,
-// 	}
-// 	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithBlock())
-// 	if err != nil {
-// 		log.Fatalf("did not connect: %v", err)
-// 	}
-// 	defer conn.Close()
-// 	client := pb.NewMasterTrackerClient(conn)
-// 	_, err = client.NotifyFileStored(context.Background(), request)
-
-// }
-
 func (dk *DataKeeper) Heartbeat() {
 	// send heartbeat to master
 	conn, err := grpc.Dial(dk.masterAddr, grpc.WithInsecure())
@@ -123,9 +56,50 @@ func (dk *DataKeeper) Heartbeat() {
 	}
 }
 
+func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperRequest) (*pb.UploadResponse, error) {
+	fileServer := tcp.NewFileServer(dk.id)
+	port, err := fileServer.Start() // port and error
+	if err != nil {
+		return nil, err
+	}
+	go fileServer.WaitOnConnections(false)
+
+	fileServer.SetOnReceive(func(filedetails tcp.FileDetails) {
+		request := &pb.NotifyFileStoredRequest{
+			DatakeeperId: dk.id,
+			FilePath:     filedetails.Path,
+			FileName:     filedetails.FileName,
+			FileHash:     filedetails.Hash,
+			Replication:  false,
+		}
+		conn, err := grpc.Dial(dk.masterAddr, grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("did not connect: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewMasterTrackerClient(conn)
+
+		resp, err := client.NotifyFileStored(context.Background(), request)
+		if resp != nil && !resp.Success {
+			switch resp.ErrorCode {
+			case pb.ErrorCode_FILE_ALREADY_EXISTS:
+				log.Printf("File already exists")
+			case pb.ErrorCode_FILE_NOT_FOUND:
+				log.Printf("File not found")
+			case pb.ErrorCode_FETAL_ERROR:
+				log.Fatalf("Fatal error: %v", resp.Message)
+			default:
+				log.Fatalf("Unknown error: %v", resp.Message)
+			}
+		}
+	})
+
+	return &pb.UploadResponse{Ip: dk.ip, Port: port}, nil
+}
+
 func (dk *DataKeeper) RequestDownload(ctx context.Context, in *pb.DownloadRequest) (*pb.DataKeeperDownloadResponse, error) {
-	fileServer := tcp.NewFileServer()
-	fileServer.SetFileDetails(*tcp.NewFileDetails(in.FileName))
+	fileServer := tcp.NewFileServer(dk.id)
+	fileServer.SetFileDetails(*tcp.NewFileDetails(in.FileName, nil, nil))
 	port, err := fileServer.Start() // port and error
 	if err != nil {
 		return nil, err

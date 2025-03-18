@@ -27,6 +27,7 @@ func createTables() {
 	CREATE TABLE IF NOT EXISTS files (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		filename TEXT NOT NULL,
+		hash TEXT NOT NULL UNIQUE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
@@ -77,4 +78,18 @@ func createIndices() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func DoesFileExistByHash(hash string, dkId string) bool {
+	statement := `
+	SELECT fl.id FROM file_locations fl
+	JOIN files f ON fl.file_id = f.id
+	WHERE f.hash = ? AND fl.data_keeper_id = ?;`
+	row := DB.QueryRow(statement, hash, dkId)
+	var id int
+	err := row.Scan(&id)
+	if err != nil {
+		return false
+	}
+	return true
 }

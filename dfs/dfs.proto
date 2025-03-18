@@ -38,8 +38,9 @@ message DownloadRequest {
 }
 
 message DownloadResponse {
-    repeated string ips = 1;
-    repeated string ports = 2;
+    repeated string ids = 1;
+    repeated string ips = 2;
+    repeated string ports = 3;
 }
 
 message DataKeeperDownloadResponse {
@@ -57,7 +58,8 @@ message NotifyFileStoredRequest {
     string datakeeperId = 1;
     string filePath = 2;
     string fileName = 3;
-    bool replication = 4; // false upload, true replicate
+    string fileHash = 4;
+    bool replication = 5; // false upload, true replicate
 }
 
 message ReplicateFileRequest {
@@ -70,4 +72,11 @@ message ReplicateFileRequest {
 message Ack {
     bool success = 1;
     string message = 2;
+    ErrorCode errorCode = 3;
+}
+
+enum ErrorCode {
+    FILE_ALREADY_EXISTS = 0;
+    FILE_NOT_FOUND = 1;
+    FETAL_ERROR = 2;
 }

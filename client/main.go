@@ -85,7 +85,7 @@ func downloadFile(fileName string) {
 	}
 
 	// Try downloading from the first available node
-	ip_1, port_1 := resp.Ips[0], resp.Ports[0]
+	id_1, ip_1, port_1 := resp.Ids[0], resp.Ips[0], resp.Ports[0]
 
 	fmt.Println("Downloading from Data Keeper at:", ip_1, port_1)
 
@@ -98,7 +98,7 @@ func downloadFile(fileName string) {
 
 	ch := make(chan tcp.FileDetails)
 	exit := make(chan bool)
-	go tcp.ReceiveFile(tcpConn, exit, ch)
+	go tcp.ReceiveFile(tcpConn, exit, ch, id_1)
 
 	for {
 		select {

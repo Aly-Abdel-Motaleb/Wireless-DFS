@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"DFS/utils"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -14,22 +15,32 @@ import (
 
 type FileDetails struct {
 	FileName string
+	Hash     string
+	Path     string
 }
 
-func NewFileDetails(filename string) *FileDetails {
-	return &FileDetails{FileName: filename}
+func NewFileDetails(filename string, hash *string, path *string) *FileDetails {
+	fd := &FileDetails{FileName: filename}
+	if hash != nil {
+		fd.Hash = *hash
+	}
+	if path != nil {
+		fd.Path = *path
+	}
+	return fd
 }
 
 type FileServer struct {
-	ln net.Listener // TCP listener
 	// wg sync.WaitGroup // WaitGroup to wait for all goroutines to finish
+	id             string
+	ln             net.Listener // TCP listener
 	ch             chan FileDetails
 	OnFileReceived func(FileDetails)
 	FileDetails    FileDetails
 }
 
-func NewFileServer() *FileServer {
-	return &FileServer{}
+func NewFileServer(id string) *FileServer {
+	return &FileServer{id: id}
 }
 
 func (fs *FileServer) SetFileDetails(filedetails FileDetails) {
@@ -99,7 +110,7 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 				// fs.handleClientDownload(conn, exitChannel)
 				SendFile(conn, fs.FileDetails.FileName)
 			} else {
-				ReceiveFile(conn, exitChannel, fs.ch) // upload reads from client
+				ReceiveFile(conn, exitChannel, fs.ch, fs.id) // upload reads from client
 			}
 			val, _ := <-exitChannel
 			if val {
@@ -137,18 +148,22 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 // 7. Sends the filename to the provided channel.
 //
 // If any error occurs during these steps, the function logs the error and returns early.
-func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
+func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string) {
 	defer conn.Close()
 
 	var filenameLen int64
 	if err := binary.Read(conn, binary.LittleEndian, &filenameLen); err != nil {
 		log.Println("Error reading filename length:", err)
+		exit <- true
+		close(exit)
 		return
 	}
 
 	filenameBuf := make([]byte, filenameLen)
 	if _, err := io.ReadFull(conn, filenameBuf); err != nil {
 		log.Println("Error reading filename:", err)
+		exit <- true
+		close(exit)
 		return
 	}
 	filename := string(filenameBuf)
@@ -156,12 +171,26 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
 	var fileSize int64
 	if err := binary.Read(conn, binary.LittleEndian, &fileSize); err != nil {
 		log.Println("Error reading file size:", err)
+		exit <- true
+		close(exit)
 		return
 	}
 
-	file, err := os.Create(filename)
+	tempFilePath := fmt.Sprintf("datakeeper_%s/temp", id)
+
+	err := os.Mkdir(tempFilePath, 0755)
+	if err != nil && !os.IsExist(err) {
+		log.Println("Failed to create temp directory:", err)
+		exit <- true
+		close(exit)
+		return
+	}
+
+	file, err := os.Create(fmt.Sprintf("%s/%s", tempFilePath, filename))
 	if err != nil {
 		log.Println("Error creating file:", err)
+		exit <- true
+		close(exit)
 		return
 	}
 	defer file.Close()
@@ -172,6 +201,8 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
 		n, err := conn.Read(buf)
 		if err != nil && err != io.EOF {
 			log.Println("Error reading data:", err)
+			exit <- true
+			close(exit)
 			return
 		}
 		if n == 0 {
@@ -181,6 +212,8 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
 		_, err = file.Write(buf[:n])
 		if err != nil {
 			log.Println("Error writing to file:", err)
+			exit <- true
+			close(exit)
 			return
 		}
 		received += int64(n)
@@ -188,6 +221,8 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
 
 	if received != fileSize {
 		log.Printf("Received %d bytes, expected %d bytes\n", received, fileSize)
+		exit <- true
+		close(exit)
 		return
 	}
 
@@ -195,12 +230,31 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
 	_, err = conn.Write([]byte("OK"))
 	if err != nil {
 		log.Println("Failed to send confirmation:", err)
+		exit <- true
+		close(exit)
+		return
 	}
 
-	fmt.Printf("Received %d/%d bytes into %s\n", received, fileSize, filename)
-	fileDetails := FileDetails{FileName: filename}
+	hash, err := utils.HashFileSHA256(fmt.Sprintf("%s/%s", tempFilePath, filename))
+	if err != nil {
+		log.Println("Failed to hash file:", err)
+		exit <- true
+		close(exit)
+		err = os.Remove(fmt.Sprintf("%s/%s", tempFilePath, filename))
+		return
+	}
 
-	ch <- fileDetails
+	err = os.Rename(fmt.Sprintf("%s/%s", tempFilePath, filename), fmt.Sprintf("datakeeper_%s/%s", id, filename))
+
+	err = os.Remove(tempFilePath)
+
+	path := fmt.Sprintf("datakeeper_%s/%s", id, filename)
+
+	fileDetails := NewFileDetails(filename, &hash, &path)
+
+	fmt.Printf("%v\n", fileDetails)
+
+	ch <- *fileDetails
 	exit <- true
 	close(exit)
 }
