@@ -29,8 +29,8 @@ func main() {
 	// 	fmt.Println("Unknown command. Use 'upload' or 'download'.")
 	// }
 
-	// uploadFile("video1.mp4")
-	downloadFile("video1.mp4")
+	uploadFile("video.mp4")
+	// downloadFile("video.mp4")
 }
 
 func uploadFile(filePath string) {

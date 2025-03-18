@@ -59,6 +59,8 @@ func (fs *FileServer) Start() (port string, err error) {
 	fs.ch = make(chan FileDetails, 1)
 	// defer ln.Close()
 
+	log.Printf("Opening port %s\n", port)
+
 	return port, nil
 }
 
@@ -102,10 +104,13 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 			val, _ := <-exitChannel
 			if val {
 				log.Printf("Closing server\n")
-				for filedetail := range fs.ch {
-					fs.OnFileReceived(filedetail)
-				}
 				fs.stop()
+				conn.Close()
+				if !download {
+					for filedetail := range fs.ch {
+						fs.OnFileReceived(filedetail)
+					}
+				}
 				return nil
 			}
 			// }(conn)
