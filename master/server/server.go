@@ -78,10 +78,25 @@ func (s *MasterServer) RequestDownload(ctx context.Context, req *pb.DownloadRequ
 		ips = append(ips, ip)
 		ports = append(ports, port)
 	}
-	if len(ips) > 0 {
-		return &pb.DownloadResponse{Ips: ips, Ports: ports}, nil
+	if len(ips) == 0 {
+		return nil, errors.New("file not found")
 	}
-	return nil, errors.New("file not found")
+	var downloadPorts []string
+	for i := 0; i < len(ips); i++ {
+		conn, err := grpc.Dial(ips[i]+":"+ports[i], grpc.WithInsecure())
+		if err != nil {
+			log.Printf("Failed to dial datakeeper: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewDataKeeperClient(conn)
+		request := &pb.DownloadRequest{FileName: req.FileName}
+		resp, err := client.RequestDownload(context.Background(), request)
+		if err != nil {
+			return nil, err
+		}
+		downloadPorts = append(downloadPorts, resp.Port)
+	}
+	return &pb.DownloadResponse{Ips: ips, Ports: downloadPorts}, nil
 }
 
 func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.Ack, error) {

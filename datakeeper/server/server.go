@@ -26,13 +26,13 @@ func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileReq
 	// Replicate file to destination
 	// in.FileName
 
-	error := tcp.SendFile(in.FilePath, in.DestinationIp, string(in.DestinationPort))
+	// error := tcp.SendFile(in.FilePath, in.DestinationIp, string(in.DestinationPort))
 
-	if error != nil {
-		return &pb.Ack{Success: false, Message: "Failed to replicate file"}, error
-	}
+	// if error != nil {
+	// 	return &pb.Ack{Success: false, Message: "Failed to replicate file"}, error
+	// }
 
-	return &pb.Ack{Success: true, Message: "File replicated successfully"}, nil
+	return nil, nil
 }
 
 func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperRequest) (*pb.UploadResponse, error) {

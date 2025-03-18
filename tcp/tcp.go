@@ -62,15 +62,6 @@ func (fs *FileServer) Start() (port string, err error) {
 	return port, nil
 }
 
-func (fs *FileServer) StartOnPort(ip, port string) (err error) {
-	ln, err := net.Listen("tcp", ip+":"+port)
-	if err != nil {
-		return fmt.Errorf("listen error: %w", err)
-	}
-	fs.ln = ln
-	return nil
-}
-
 // stops the file server by closing the listener and waiting for all
 func (fs *FileServer) stop() {
 	if fs.ln != nil {
@@ -78,6 +69,15 @@ func (fs *FileServer) stop() {
 	}
 }
 
+// WaitOnConnections waits for incoming connections on the server.
+// It takes a boolean argument to determine whether the server should handle
+// file downloads or uploads.
+//
+// Args:
+//   - download (bool): A boolean value to determine whether the server should handle downloads or uploads.
+//
+// Returns:
+//   - error: An error if any occurs during the process, otherwise nil.
 func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 	exitChannel := make(chan bool, 1)
 	for {
@@ -94,14 +94,10 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 			// go func(c net.Conn) {
 			// 	defer fs.wg.Done()
 			if download {
-				tcpaddr, ok := conn.RemoteAddr().(*net.TCPAddr)
-				if !ok {
-					log.Println("Error getting remote address")
-					return errors.New("we are fucked up!")
-				}
-				SendFile(fs.FileDetails.FileName, conn.RemoteAddr().String(), strconv.Itoa(tcpaddr.Port))
+				// fs.handleClientDownload(conn, exitChannel)
+				SendFile(conn, fs.FileDetails.FileName)
 			} else {
-				fs.readLoop(conn, exitChannel)
+				ReceiveFile(conn, exitChannel, fs.ch) // upload reads from client
 			}
 			val, _ := <-exitChannel
 			if val {
@@ -117,7 +113,7 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 	}
 }
 
-// readLoop reads a file from a TCP connection and saves it to the local filesystem.
+// receiveFileData reads a file from a TCP connection and saves it to the local filesystem.
 // It also sends a confirmation message back to the client and sends the filename
 // to the provided channel upon successful completion.
 //
@@ -136,7 +132,7 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 // 7. Sends the filename to the provided channel.
 //
 // If any error occurs during these steps, the function logs the error and returns early.
-func (fs *FileServer) readLoop(conn net.Conn, exit chan bool) {
+func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails) {
 	defer conn.Close()
 
 	var filenameLen int64
@@ -199,7 +195,7 @@ func (fs *FileServer) readLoop(conn net.Conn, exit chan bool) {
 	fmt.Printf("Received %d/%d bytes into %s\n", received, fileSize, filename)
 	fileDetails := FileDetails{FileName: filename}
 
-	fs.ch <- fileDetails
+	ch <- fileDetails
 	exit <- true
 	close(exit)
 }
@@ -214,7 +210,7 @@ func (fs *FileServer) readLoop(conn net.Conn, exit chan bool) {
 //
 // Returns:
 //   - error: An error if any occurs during the file sending process, otherwise nil.
-func SendFile(path, ip, port string) error {
+func SendFile(conn net.Conn, path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -229,12 +225,6 @@ func SendFile(path, ip, port string) error {
 		return err
 	}
 	fileSize := fi.Size()
-
-	conn, err := net.Dial("tcp", ip+":"+port)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
 
 	if err := binary.Write(conn, binary.LittleEndian, filenameLen); err != nil {
 		return err
@@ -284,36 +274,3 @@ func SendFile(path, ip, port string) error {
 
 	return nil
 }
-
-// func tcp() {
-// 	startTime := time.Now()
-// 	fs := &FileServer{}
-// 	serverDone := make(chan error)
-
-// 	// Start server in a goroutine
-// 	go func() {
-// 		serverDone <- fs.Start("3000")
-// 	}()
-
-// 	// Give the server a moment to start
-// 	time.Sleep(100 * time.Millisecond)
-
-// 	// Client part
-// 	go func() {
-// 		var path string
-// 		fmt.Print("Enter file path to send: ")
-// 		fmt.Scan(&path)
-// 		if err := SendFile(path, "localhost", "3000"); err != nil {
-// 			log.Fatal("Send file error:", err)
-// 		}
-// 		// Stop the server after sending
-// 		fs.stop()
-// 	}()
-
-// 	// Wait for the server to finish
-// 	if err := <-serverDone; err != nil {
-// 		log.Fatal("Server error:", err)
-// 	}
-
-// 	fmt.Printf("Time taken: %v\n", time.Since(startTime))
-// }
