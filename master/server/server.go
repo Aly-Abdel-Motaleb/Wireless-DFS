@@ -43,7 +43,7 @@ func (s *MasterServer) RequestUpload(ctx context.Context, req *pb.UploadRequest)
 	}
 	defer conn.Close()
 	client := pb.NewDataKeeperClient(conn)
-	request := &pb.DatakeeperRequest{}
+	request := &pb.EmptyRequest{}
 	dkResponse, err := client.RequestUpload(context.Background(), request)
 	if err != nil {
 		return nil, err
@@ -136,8 +136,8 @@ func (s *MasterServer) NotifyFileStored(ctx context.Context, req *pb.NotifyFileS
 				nil
 		}
 	} else {
-		query := `INSERT INTO files (filename, hash) VALUES (?, ?);`
-		res, err := db.DB.Exec(query, req.FileName, req.FileHash)
+		query := `INSERT INTO files (filename, hash, size) VALUES (?, ?, ?);`
+		res, err := db.DB.Exec(query, req.FileName, req.FileHash, req.FileSize)
 		if err != nil {
 			return nil, err
 		}
@@ -159,6 +159,31 @@ func (s *MasterServer) NotifyFileStored(ctx context.Context, req *pb.NotifyFileS
 	}
 
 	return &pb.Ack{Success: true, Message: "File stored"}, nil
+}
+
+func (s *MasterServer) ListFiles(ctx context.Context, req *pb.EmptyRequest) (*pb.FileDetailsResponse, error) {
+	query := `
+	SELECT f.id, f.filename, f.hash, f.size, f.created_at
+	FROM files f;
+	`
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var files []*pb.FileDetails
+	for rows.Next() {
+		var file pb.FileDetails
+		err := rows.Scan(&file.Id, &file.Name, &file.Hash, &file.Size, &file.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, &file)
+	}
+
+	return &pb.FileDetailsResponse{FileDetails: files}, nil
 }
 
 func (s *MasterServer) UpdateDataKeepersAliveStatus() {

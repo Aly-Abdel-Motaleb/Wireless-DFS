@@ -56,7 +56,7 @@ func (dk *DataKeeper) Heartbeat() {
 	}
 }
 
-func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperRequest) (*pb.UploadResponse, error) {
+func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.EmptyRequest) (*pb.UploadResponse, error) {
 	fileServer := tcp.NewFileServer(dk.id)
 	port, err := fileServer.Start() // port and error
 	if err != nil {
@@ -70,6 +70,7 @@ func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperReques
 			FilePath:     filedetails.Path,
 			FileName:     filedetails.FileName,
 			FileHash:     filedetails.Hash,
+			FileSize:     filedetails.Size,
 			Replication:  false,
 		}
 		conn, err := grpc.Dial(dk.masterAddr, grpc.WithInsecure())
@@ -99,7 +100,7 @@ func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DatakeeperReques
 
 func (dk *DataKeeper) RequestDownload(ctx context.Context, in *pb.DownloadRequest) (*pb.DataKeeperDownloadResponse, error) {
 	fileServer := tcp.NewFileServer(dk.id)
-	fileServer.SetFileDetails(*tcp.NewFileDetails(in.FileName, nil, nil))
+	fileServer.SetFileDetails(*tcp.NewFileDetails(in.FileName, nil, nil, nil))
 	port, err := fileServer.Start() // port and error
 	if err != nil {
 		return nil, err

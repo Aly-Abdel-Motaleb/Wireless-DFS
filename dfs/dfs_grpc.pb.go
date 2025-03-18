@@ -25,6 +25,7 @@ const (
 	MasterTracker_RequestDownload_FullMethodName  = "/dfs.masterTracker/requestDownload"
 	MasterTracker_Heartbeat_FullMethodName        = "/dfs.masterTracker/heartbeat"
 	MasterTracker_NotifyFileStored_FullMethodName = "/dfs.masterTracker/notifyFileStored"
+	MasterTracker_ListFiles_FullMethodName        = "/dfs.masterTracker/ListFiles"
 )
 
 // MasterTrackerClient is the client API for MasterTracker service.
@@ -37,6 +38,7 @@ type MasterTrackerClient interface {
 	RequestDownload(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DownloadResponse, error)
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*Ack, error)
 	NotifyFileStored(ctx context.Context, in *NotifyFileStoredRequest, opts ...grpc.CallOption) (*Ack, error)
+	ListFiles(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*FileDetailsResponse, error)
 }
 
 type masterTrackerClient struct {
@@ -87,6 +89,16 @@ func (c *masterTrackerClient) NotifyFileStored(ctx context.Context, in *NotifyFi
 	return out, nil
 }
 
+func (c *masterTrackerClient) ListFiles(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*FileDetailsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FileDetailsResponse)
+	err := c.cc.Invoke(ctx, MasterTracker_ListFiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MasterTrackerServer is the server API for MasterTracker service.
 // All implementations must embed UnimplementedMasterTrackerServer
 // for forward compatibility.
@@ -97,6 +109,7 @@ type MasterTrackerServer interface {
 	RequestDownload(context.Context, *DownloadRequest) (*DownloadResponse, error)
 	Heartbeat(context.Context, *HeartbeatRequest) (*Ack, error)
 	NotifyFileStored(context.Context, *NotifyFileStoredRequest) (*Ack, error)
+	ListFiles(context.Context, *EmptyRequest) (*FileDetailsResponse, error)
 	mustEmbedUnimplementedMasterTrackerServer()
 }
 
@@ -118,6 +131,9 @@ func (UnimplementedMasterTrackerServer) Heartbeat(context.Context, *HeartbeatReq
 }
 func (UnimplementedMasterTrackerServer) NotifyFileStored(context.Context, *NotifyFileStoredRequest) (*Ack, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifyFileStored not implemented")
+}
+func (UnimplementedMasterTrackerServer) ListFiles(context.Context, *EmptyRequest) (*FileDetailsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListFiles not implemented")
 }
 func (UnimplementedMasterTrackerServer) mustEmbedUnimplementedMasterTrackerServer() {}
 func (UnimplementedMasterTrackerServer) testEmbeddedByValue()                       {}
@@ -212,6 +228,24 @@ func _MasterTracker_NotifyFileStored_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MasterTracker_ListFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterTrackerServer).ListFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MasterTracker_ListFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterTrackerServer).ListFiles(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MasterTracker_ServiceDesc is the grpc.ServiceDesc for MasterTracker service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -235,14 +269,18 @@ var MasterTracker_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "notifyFileStored",
 			Handler:    _MasterTracker_NotifyFileStored_Handler,
 		},
+		{
+			MethodName: "ListFiles",
+			Handler:    _MasterTracker_ListFiles_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "dfs.proto",
 }
 
 const (
-	DataKeeper_RequestUpload_FullMethodName   = "/dfs.dataKeeper/requestUpload"
 	DataKeeper_ReplicateFile_FullMethodName   = "/dfs.dataKeeper/replicateFile"
+	DataKeeper_RequestUpload_FullMethodName   = "/dfs.dataKeeper/requestUpload"
 	DataKeeper_RequestDownload_FullMethodName = "/dfs.dataKeeper/requestDownload"
 )
 
@@ -250,8 +288,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataKeeperClient interface {
-	RequestUpload(ctx context.Context, in *DatakeeperRequest, opts ...grpc.CallOption) (*UploadResponse, error)
 	ReplicateFile(ctx context.Context, in *ReplicateFileRequest, opts ...grpc.CallOption) (*Ack, error)
+	RequestUpload(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*UploadResponse, error)
 	RequestDownload(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DataKeeperDownloadResponse, error)
 }
 
@@ -263,20 +301,20 @@ func NewDataKeeperClient(cc grpc.ClientConnInterface) DataKeeperClient {
 	return &dataKeeperClient{cc}
 }
 
-func (c *dataKeeperClient) RequestUpload(ctx context.Context, in *DatakeeperRequest, opts ...grpc.CallOption) (*UploadResponse, error) {
+func (c *dataKeeperClient) ReplicateFile(ctx context.Context, in *ReplicateFileRequest, opts ...grpc.CallOption) (*Ack, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UploadResponse)
-	err := c.cc.Invoke(ctx, DataKeeper_RequestUpload_FullMethodName, in, out, cOpts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, DataKeeper_ReplicateFile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dataKeeperClient) ReplicateFile(ctx context.Context, in *ReplicateFileRequest, opts ...grpc.CallOption) (*Ack, error) {
+func (c *dataKeeperClient) RequestUpload(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*UploadResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Ack)
-	err := c.cc.Invoke(ctx, DataKeeper_ReplicateFile_FullMethodName, in, out, cOpts...)
+	out := new(UploadResponse)
+	err := c.cc.Invoke(ctx, DataKeeper_RequestUpload_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +335,8 @@ func (c *dataKeeperClient) RequestDownload(ctx context.Context, in *DownloadRequ
 // All implementations must embed UnimplementedDataKeeperServer
 // for forward compatibility.
 type DataKeeperServer interface {
-	RequestUpload(context.Context, *DatakeeperRequest) (*UploadResponse, error)
 	ReplicateFile(context.Context, *ReplicateFileRequest) (*Ack, error)
+	RequestUpload(context.Context, *EmptyRequest) (*UploadResponse, error)
 	RequestDownload(context.Context, *DownloadRequest) (*DataKeeperDownloadResponse, error)
 	mustEmbedUnimplementedDataKeeperServer()
 }
@@ -310,11 +348,11 @@ type DataKeeperServer interface {
 // pointer dereference when methods are called.
 type UnimplementedDataKeeperServer struct{}
 
-func (UnimplementedDataKeeperServer) RequestUpload(context.Context, *DatakeeperRequest) (*UploadResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RequestUpload not implemented")
-}
 func (UnimplementedDataKeeperServer) ReplicateFile(context.Context, *ReplicateFileRequest) (*Ack, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReplicateFile not implemented")
+}
+func (UnimplementedDataKeeperServer) RequestUpload(context.Context, *EmptyRequest) (*UploadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestUpload not implemented")
 }
 func (UnimplementedDataKeeperServer) RequestDownload(context.Context, *DownloadRequest) (*DataKeeperDownloadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestDownload not implemented")
@@ -340,24 +378,6 @@ func RegisterDataKeeperServer(s grpc.ServiceRegistrar, srv DataKeeperServer) {
 	s.RegisterService(&DataKeeper_ServiceDesc, srv)
 }
 
-func _DataKeeper_RequestUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DatakeeperRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DataKeeperServer).RequestUpload(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DataKeeper_RequestUpload_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DataKeeperServer).RequestUpload(ctx, req.(*DatakeeperRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _DataKeeper_ReplicateFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReplicateFileRequest)
 	if err := dec(in); err != nil {
@@ -372,6 +392,24 @@ func _DataKeeper_ReplicateFile_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DataKeeperServer).ReplicateFile(ctx, req.(*ReplicateFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataKeeper_RequestUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataKeeperServer).RequestUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataKeeper_RequestUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataKeeperServer).RequestUpload(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -402,12 +440,12 @@ var DataKeeper_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*DataKeeperServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "requestUpload",
-			Handler:    _DataKeeper_RequestUpload_Handler,
-		},
-		{
 			MethodName: "replicateFile",
 			Handler:    _DataKeeper_ReplicateFile_Handler,
+		},
+		{
+			MethodName: "requestUpload",
+			Handler:    _DataKeeper_RequestUpload_Handler,
 		},
 		{
 			MethodName: "requestDownload",

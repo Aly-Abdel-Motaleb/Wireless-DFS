@@ -28,6 +28,7 @@ func createTables() {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		filename TEXT NOT NULL,
 		hash TEXT NOT NULL UNIQUE,
+		size INTEGER NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`

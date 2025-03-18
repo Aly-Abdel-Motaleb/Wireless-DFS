@@ -17,15 +17,19 @@ type FileDetails struct {
 	FileName string
 	Hash     string
 	Path     string
+	Size     int64
 }
 
-func NewFileDetails(filename string, hash *string, path *string) *FileDetails {
+func NewFileDetails(filename string, hash *string, path *string, size *int64) *FileDetails {
 	fd := &FileDetails{FileName: filename}
 	if hash != nil {
 		fd.Hash = *hash
 	}
 	if path != nil {
 		fd.Path = *path
+	}
+	if size != nil {
+		fd.Size = *size
 	}
 	return fd
 }
@@ -108,9 +112,10 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 			// 	defer fs.wg.Done()
 			if download {
 				// fs.handleClientDownload(conn, exitChannel)
-				SendFile(conn, fs.FileDetails.FileName)
+				log.Printf("file details: %v\n", fs.FileDetails)
+				SendFile(conn, fmt.Sprintf("datakeeper_%s/%s", fs.id, fs.FileDetails.FileName))
 			} else {
-				ReceiveFile(conn, exitChannel, fs.ch, fs.id) // upload reads from client
+				ReceiveFile(conn, exitChannel, fs.ch, fs.id, fmt.Sprintf("datakeeper_%s", fs.id))
 			}
 			val, _ := <-exitChannel
 			if val {
@@ -148,7 +153,7 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 // 7. Sends the filename to the provided channel.
 //
 // If any error occurs during these steps, the function logs the error and returns early.
-func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string) {
+func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, dirPath string) {
 	defer conn.Close()
 
 	var filenameLen int64
@@ -176,9 +181,9 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string) 
 		return
 	}
 
-	tempFilePath := fmt.Sprintf("datakeeper_%s/temp", id)
+	tempFilePath := fmt.Sprintf("%s/temp", dirPath)
 
-	err := os.Mkdir(tempFilePath, 0755)
+	err := os.MkdirAll(tempFilePath, 0755)
 	if err != nil && !os.IsExist(err) {
 		log.Println("Failed to create temp directory:", err)
 		exit <- true
@@ -244,14 +249,13 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string) 
 		return
 	}
 
-	err = os.Rename(fmt.Sprintf("%s/%s", tempFilePath, filename), fmt.Sprintf("datakeeper_%s/%s", id, filename))
+	path := fmt.Sprintf("%s/%s", dirPath, filename)
+
+	err = os.Rename(fmt.Sprintf("%s/%s", tempFilePath, filename), path)
 
 	err = os.Remove(tempFilePath)
 
-	path := fmt.Sprintf("datakeeper_%s/%s", id, filename)
-
-	fileDetails := NewFileDetails(filename, &hash, &path)
-
+	fileDetails := NewFileDetails(filename, &hash, &path, &fileSize)
 	fmt.Printf("%v\n", fileDetails)
 
 	ch <- *fileDetails
