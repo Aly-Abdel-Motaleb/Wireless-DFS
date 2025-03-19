@@ -25,16 +25,6 @@ func main() {
 	if len(os.Args) == 1 {
 		app := tview.NewApplication()
 		menu := mainMenu(app)
-		// menu := tview.NewList()
-
-		// menu.SetMainTextStyle(defaultStyle)
-		// menu.SetBackgroundColor(bgColor)
-		// menu.SetShortcutStyle(defaultStyle)
-
-		// menu.AddItem("Upload File", "", 'u', func() { promptFileUpload(app) })
-		// menu.AddItem("Download File", "", 'd', func() { listFiles(app) })
-		// menu.AddItem("Exit", "", 'q', func() { app.Stop() })
-
 		if err := app.SetRoot(menu, true).Run(); err != nil {
 			log.Fatalf("Error running TUI: %v", err)
 		}
@@ -42,13 +32,15 @@ func main() {
 
 	switch os.Args[1] {
 	case "upload":
-		if len(os.Args) < 3 {
-			uploadFile(os.Args[2])
+		if len(os.Args) <= 3 {
+			uploadFile(os.Args[2], func(message string) {
+				log.Println(message)
+			})
 		} else {
 			log.Println("Usage: go run main.go upload <file_path>")
 		}
 	case "download":
-		if len(os.Args) < 3 {
+		if len(os.Args) <= 3 {
 			downloadFile(os.Args[2], func() {})
 		} else {
 			log.Println("Usage: go run main.go upload <file_path>")
@@ -79,41 +71,64 @@ func promptFileUpload(app *tview.Application) {
 	input.SetLabel("Enter file path: ").SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
 			filePath := input.GetText()
-			go uploadFile(filePath)
-			app.SetRoot(mainMenu(app), true)
+			func() {
+				go uploadFile(filePath, func(message string) {
+					app.QueueUpdateDraw(func() {
+						modal := tview.NewModal().
+							SetText(message).
+							AddButtons([]string{"OK"}).
+							SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+								app.SetRoot(mainMenu(app), true)
+							})
+						app.SetRoot(modal, true)
+					})
+				})
+			}()
+
 		}
 	})
 	app.SetRoot(input, true).SetFocus(input)
 }
 
-func uploadFile(filePath string) {
+func uploadFile(filePath string, finish func(string)) {
+
 	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
 	if err != nil {
-		log.Println("Failed to connect to Master Tracker:", err)
-		return
+		message := fmt.Sprintf("Failed to connect to Master Tracker: %v", err)
+		finish(message)
 	}
 	defer conn.Close()
 
 	client := pb.NewMasterTrackerClient(conn)
 	resp, err := client.RequestUpload(context.Background(), &pb.UploadRequest{FileName: filePath})
 	if err != nil {
-		log.Println("Failed to get Data Keeper node:", err)
-		return
+		message := fmt.Sprintf("Failed to get Data Keeper node: %v", err)
+		finish(message)
 	}
 
 	tcpConn, err := net.Dial("tcp", resp.Ip+":"+resp.Port)
 	if err != nil {
-		log.Println("Failed to connect to Data Keeper:", err)
-		return
+		message := fmt.Sprintf("Failed to connect to Data Keeper: %v", err)
+		finish(message)
 	}
 	defer tcpConn.Close()
 
 	err = tcp.SendFile(tcpConn, filePath)
 	if err != nil {
-		log.Println("File upload failed:", err)
-		return
+		message := fmt.Sprintf("File upload failed: %v", err)
+		finish(message)
 	}
-	log.Println("Upload successful.")
+
+	ack, err := client.DoesFileExist(context.Background(), &pb.DownloadRequest{FileName: filePath})
+	if err != nil {
+		message := fmt.Sprintf("File upload failed: %v", err)
+		finish(message)
+	}
+
+	if ack != nil && ack.Success {
+		message := "File uploaded successfully."
+		finish(message)
+	}
 }
 
 func listFiles() ([]*pb.FileDetails, error) {
@@ -133,7 +148,6 @@ func listFiles() ([]*pb.FileDetails, error) {
 
 	return resp.FileDetails, nil
 }
-
 func listFilesTui(app *tview.Application) {
 	files, err := listFiles()
 	if err != nil {
@@ -155,12 +169,11 @@ func listFilesTui(app *tview.Application) {
 						SetText("Download completed successfully!").
 						AddButtons([]string{"OK"}).
 						SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-							app.SetRoot(mainMenu(app), true)
+							app.SetRoot(listView, true) // Return to the list view after closing the modal
 						})
 					app.SetRoot(modal, true)
 				})
 			})
-			app.SetRoot(mainMenu(app), true)
 		})
 	}
 	listView.AddItem("Back", "", 'b', func() { app.SetRoot(mainMenu(app), true) })

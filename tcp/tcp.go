@@ -117,7 +117,9 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 			} else {
 				ReceiveFile(conn, exitChannel, fs.ch, fs.id, fmt.Sprintf("datakeeper_%s", fs.id))
 			}
+
 			val, _ := <-exitChannel
+
 			if val {
 				log.Printf("Closing server\n")
 				fs.stop()
@@ -129,7 +131,7 @@ func (fs *FileServer) WaitOnConnections(download bool) (err error) {
 				}
 				return nil
 			}
-			// }(conn)
+
 		}
 	}
 }
@@ -181,9 +183,28 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		return
 	}
 
+	filePath := fmt.Sprintf("%s/%s", dirPath, filename)
+
+	_, err := os.Stat(filePath)
+	if err == nil {
+		ext := filepath.Ext(filename)
+		base := filename[:len(filename)-len(ext)]
+		counter := 1
+		for {
+			newFilename := fmt.Sprintf("%s_%d%s", base, counter, ext)
+			newFilePath := fmt.Sprintf("%s/%s", dirPath, newFilename)
+			if _, err := os.Stat(newFilePath); os.IsNotExist(err) {
+				filename = newFilename
+				filePath = newFilePath
+				break
+			}
+			counter++
+		}
+	}
+
 	tempFilePath := fmt.Sprintf("%s/temp", dirPath)
 
-	err := os.MkdirAll(tempFilePath, 0755)
+	err = os.MkdirAll(tempFilePath, 0755)
 	if err != nil && !os.IsExist(err) {
 		log.Println("Failed to create temp directory:", err)
 		exit <- true
@@ -245,17 +266,15 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		log.Println("Failed to hash file:", err)
 		exit <- true
 		close(exit)
-		err = os.Remove(fmt.Sprintf("%s/%s", tempFilePath, filename))
+		_ = os.Remove(fmt.Sprintf("%s/%s", tempFilePath, filename))
 		return
 	}
 
-	path := fmt.Sprintf("%s/%s", dirPath, filename)
+	_ = os.Rename(fmt.Sprintf("%s/%s", tempFilePath, filename), filePath)
 
-	err = os.Rename(fmt.Sprintf("%s/%s", tempFilePath, filename), path)
+	_ = os.Remove(tempFilePath)
 
-	err = os.Remove(tempFilePath)
-
-	fileDetails := NewFileDetails(filename, &hash, &path, &fileSize)
+	fileDetails := NewFileDetails(filename, &hash, &filePath, &fileSize)
 
 	ch <- *fileDetails
 	exit <- true
@@ -331,8 +350,5 @@ func SendFile(conn net.Conn, path string) error {
 	if string(confirmation) != "OK" {
 		return fmt.Errorf("server did not confirm receipt")
 	}
-
-	fmt.Printf("Sent %d/%d bytes of %s\n", sent, fileSize, filename)
-
 	return nil
 }

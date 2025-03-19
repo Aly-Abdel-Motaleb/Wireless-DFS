@@ -186,6 +186,26 @@ func (s *MasterServer) ListFiles(ctx context.Context, req *pb.EmptyRequest) (*pb
 	return &pb.FileDetailsResponse{FileDetails: files}, nil
 }
 
+func (s *MasterServer) DoesFileExist(ctx context.Context, req *pb.DownloadRequest) (*pb.Ack, error) {
+
+	query := `
+	SELECT COUNT(f.id)
+	FROM files f
+	WHERE f.filename = ?;
+	`
+	var count int
+	err := db.DB.QueryRow(query, req.FileName).Scan(&count)
+	if err != nil {
+		return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to check file existence: %v", err), ErrorCode: pb.ErrorCode_FETAL_ERROR}, nil
+	}
+
+	if count == 0 {
+		return &pb.Ack{Success: false, Message: "File does not exist", ErrorCode: pb.ErrorCode_FILE_NOT_FOUND}, nil
+	}
+
+	return &pb.Ack{Success: true, Message: "File exists"}, nil
+}
+
 func (s *MasterServer) UpdateDataKeepersAliveStatus() {
 	_, err := db.DB.Exec("UPDATE datakeepers SET is_alive = 0 where last_heartbeat < datetime('now', '-10 seconds');")
 	if err != nil {
@@ -277,7 +297,7 @@ func (s *MasterServer) ReplicateFiles() (err error) {
 		defer conn.Close()
 		client := pb.NewDataKeeperClient(conn)
 		resp, _ := client.ReplicateFile(context.Background(), &pb.ReplicateFileRequest{FileId: int64(file.Id), Ids: ids, Ips: ips, Ports: ports, FileName: file.FileName, FilePath: file.FilePath})
-		if !resp.Success {
+		if resp != nil && !resp.Success {
 			log.Printf("Failed to replicate file: %v", resp.Message)
 		}
 

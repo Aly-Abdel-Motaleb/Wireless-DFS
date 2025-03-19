@@ -13,6 +13,7 @@ service masterTracker {
   rpc heartbeat(HeartbeatRequest) returns (Ack);
   rpc notifyFileStored(NotifyFileStoredRequest) returns (Ack);
   rpc ListFiles(EmptyRequest) returns (FileDetailsResponse);
+  rpc DoesFileExist(DownloadRequest) returns (Ack);
 }
 
 service dataKeeper {
@@ -90,5 +91,6 @@ message Ack {
 enum ErrorCode {
   FILE_ALREADY_EXISTS = 0;
   FILE_NOT_FOUND = 1;
-  FETAL_ERROR = 2;
+  DATABASE_FAILURE = 2;
+  FETAL_ERROR = 3;
 }
