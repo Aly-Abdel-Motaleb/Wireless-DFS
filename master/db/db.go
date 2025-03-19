@@ -43,7 +43,7 @@ func createTables() {
 	);
 	`
 
-	matchesTable := `
+	fileLocationsTable := `
 	CREATE TABLE IF NOT EXISTS file_locations (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		file_id INTEGER NOT NULL,
@@ -62,7 +62,7 @@ func createTables() {
 		panic(err)
 	}
 
-	_, err = DB.Exec(matchesTable)
+	_, err = DB.Exec(fileLocationsTable)
 	if err != nil {
 		panic(err)
 	}

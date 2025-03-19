@@ -5,6 +5,7 @@ import (
 	tcp "DFS/tcp"
 	"context"
 	"log"
+	"net"
 	"os"
 
 	"google.golang.org/grpc"
@@ -23,14 +24,30 @@ func NewDataKeeperServer(id, ip, port, masterAdr string) *DataKeeper {
 }
 
 func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileRequest) (*pb.Ack, error) {
-	// Replicate file to destination
-	// in.FileName
 
-	// error := tcp.SendFile(in.FilePath, in.DestinationIp, string(in.DestinationPort))
-
-	// if error != nil {
-	// 	return &pb.Ack{Success: false, Message: "Failed to replicate file"}, error
-	// }
+	for i, _ := range in.Ids {
+		conn, err := grpc.Dial(in.Ips[i]+":"+in.Ports[i], grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("Failed to dial datakeeper: %v", err)
+		}
+		defer conn.Close()
+		client := pb.NewDataKeeperClient(conn)
+		request := &pb.DataKeeperUploadRequest{Replication: true}
+		// return the ip and port for the tcp connections
+		resp, err := client.RequestUpload(context.Background(), request)
+		if err != nil {
+			return nil, err
+		}
+		tcpConn, err := net.Dial("tcp", resp.Ip+":"+resp.Port)
+		if err != nil {
+			return nil, err
+		}
+		defer tcpConn.Close()
+		err = tcp.SendFile(tcpConn, in.FilePath)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return nil, nil
 }
@@ -56,7 +73,7 @@ func (dk *DataKeeper) Heartbeat() {
 	}
 }
 
-func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.EmptyRequest) (*pb.UploadResponse, error) {
+func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.DataKeeperUploadRequest) (*pb.UploadResponse, error) {
 	fileServer := tcp.NewFileServer(dk.id)
 	port, err := fileServer.Start() // port and error
 	if err != nil {
@@ -71,7 +88,7 @@ func (dk *DataKeeper) RequestUpload(ctx context.Context, in *pb.EmptyRequest) (*
 			FileName:     filedetails.FileName,
 			FileHash:     filedetails.Hash,
 			FileSize:     filedetails.Size,
-			Replication:  false,
+			Replication:  in.Replication,
 		}
 		conn, err := grpc.Dial(dk.masterAddr, grpc.WithInsecure())
 		if err != nil {

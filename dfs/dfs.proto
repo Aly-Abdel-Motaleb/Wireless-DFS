@@ -17,11 +17,15 @@ service masterTracker {
 
 service dataKeeper {
   rpc replicateFile(ReplicateFileRequest) returns (Ack);
-  rpc requestUpload(EmptyRequest) returns (UploadResponse);
+  rpc requestUpload(DataKeeperUploadRequest) returns (UploadResponse);
   rpc requestDownload(DownloadRequest) returns (DataKeeperDownloadResponse);
 }
 
 message EmptyRequest {}
+
+message DataKeeperUploadRequest {
+  bool replication = 1;
+}
 
 message FileDetails {
   int64 id = 1;
@@ -69,10 +73,12 @@ message NotifyFileStoredRequest {
 }
 
 message ReplicateFileRequest {
-  string fileName = 1;
-  string filePath = 2;
-  string destinationIp = 3;
-  string destinationPort = 4;
+  int64 fileId = 1;
+  repeated string ids = 2;
+  repeated string ips = 3;
+  repeated string ports = 4;
+  string fileName = 5;
+  string filePath = 6;
 }
 
 message Ack {

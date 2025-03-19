@@ -43,7 +43,7 @@ func (s *MasterServer) RequestUpload(ctx context.Context, req *pb.UploadRequest)
 	}
 	defer conn.Close()
 	client := pb.NewDataKeeperClient(conn)
-	request := &pb.EmptyRequest{}
+	request := &pb.DataKeeperUploadRequest{Replication: false}
 	dkResponse, err := client.RequestUpload(context.Background(), request)
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) 
 }
 
 func (s *MasterServer) NotifyFileStored(ctx context.Context, req *pb.NotifyFileStoredRequest) (*pb.Ack, error) {
-	// based on wether it's a replication or upload request
+	// based on whether it's a replication or upload request
 	// if replication request, search for file id
 	// if upload request, insert file into files table
 
@@ -192,4 +192,95 @@ func (s *MasterServer) UpdateDataKeepersAliveStatus() {
 		log.Printf("Cannot update datakeepers alive status: %v", err)
 		log.Fatal("Cannot update datakeepers alive status")
 	}
+}
+
+func (s *MasterServer) ReplicateFiles() (err error) {
+	//// 1. select all files that have less than 3 copies in an alive datakeeper
+	//// 2. loop through each file and select a proper number of datakeepers to replicate the file to
+	// 3. start copying file from source datakeeper to destination datakeeper
+	// 4. update the database after replication is done0
+
+	type File struct {
+		Id             int
+		FileName       string
+		FileCount      int
+		DataKeeper     string
+		DataKeeperIp   string
+		DataKeeperPort string
+		FilePath       string
+	}
+
+	query := `
+		SELECT f.id, f.filename, COUNT(fl.file_id) as file_count , dk.id , dk.ip, dk.port , fl.filepath
+		FROM files f
+		LEFT JOIN file_locations fl ON f.id = fl.file_id
+		LEFT JOIN datakeepers dk ON fl.data_keeper_id = dk.id
+		WHERE dk.is_alive = 1
+		GROUP BY f.id
+		HAVING file_count < 3;
+	`
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var file File
+		err := rows.Scan(&file.Id, &file.FileName, &file.FileCount, &file.DataKeeper, &file.DataKeeperIp, &file.DataKeeperPort, &file.FilePath)
+		if err != nil {
+			return err
+		}
+		files = append(files, file)
+	}
+
+	for _, file := range files {
+		// select a proper number of datakeepers to replicate the file to
+		numberToReplicate := 3 - file.FileCount
+		// select datakeepers to replicate the file to randomly where the file doesn't exist
+		query := `
+		SELECT dk.id, dk.ip, dk.port
+		FROM datakeepers dk
+		WHERE dk.is_alive = 1 AND dk.id != ? AND dk.id NOT IN (
+			SELECT fl.data_keeper_id
+			FROM file_locations fl
+			WHERE fl.file_id = ?
+		)
+		ORDER BY RANDOM()
+		LIMIT ?;
+		`
+		rows, err := db.DB.Query(query, file.DataKeeper, file.Id, numberToReplicate)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		var ips []string
+		var ports []string
+		var ids []string
+		for rows.Next() {
+			var id string
+			var ip string
+			var port string
+			err := rows.Scan(&id, &ip, &port)
+			if err != nil {
+				return err
+			}
+			ips = append(ips, ip)
+			ports = append(ports, port)
+			ids = append(ids, id)
+		}
+		// start copying file from source datakeeper to destination datakeeper
+		conn, err := grpc.Dial(file.DataKeeperIp+":"+file.DataKeeperPort, grpc.WithInsecure())
+		if err != nil {
+			log.Printf("Failed to dial datakeeper: %v", err)
+			return err
+		}
+		defer conn.Close()
+		client := pb.NewDataKeeperClient(conn)
+		resp, err := client.ReplicateFile(context.Background(), &pb.ReplicateFileRequest{FileId: int64(file.Id), Ids: ids, Ips: ips, Ports: ports, FileName: file.FileName, FilePath: file.FilePath})
+		log.Printf("Replication response: %v", resp)
+	}
+
+	return nil
 }
