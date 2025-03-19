@@ -189,8 +189,7 @@ func (s *MasterServer) ListFiles(ctx context.Context, req *pb.EmptyRequest) (*pb
 func (s *MasterServer) UpdateDataKeepersAliveStatus() {
 	_, err := db.DB.Exec("UPDATE datakeepers SET is_alive = 0 where last_heartbeat < datetime('now', '-10 seconds');")
 	if err != nil {
-		log.Printf("Cannot update datakeepers alive status: %v", err)
-		log.Fatal("Cannot update datakeepers alive status")
+		log.Fatalf("Cannot update datakeepers alive status: %v", err)
 	}
 }
 
@@ -274,12 +273,14 @@ func (s *MasterServer) ReplicateFiles() (err error) {
 		conn, err := grpc.Dial(file.DataKeeperIp+":"+file.DataKeeperPort, grpc.WithInsecure())
 		if err != nil {
 			log.Printf("Failed to dial datakeeper: %v", err)
-			return err
 		}
 		defer conn.Close()
 		client := pb.NewDataKeeperClient(conn)
-		resp, err := client.ReplicateFile(context.Background(), &pb.ReplicateFileRequest{FileId: int64(file.Id), Ids: ids, Ips: ips, Ports: ports, FileName: file.FileName, FilePath: file.FilePath})
-		log.Printf("Replication response: %v", resp)
+		resp, _ := client.ReplicateFile(context.Background(), &pb.ReplicateFileRequest{FileId: int64(file.Id), Ids: ids, Ips: ips, Ports: ports, FileName: file.FileName, FilePath: file.FilePath})
+		if !resp.Success {
+			log.Printf("Failed to replicate file: %v", resp.Message)
+		}
+
 	}
 
 	return nil

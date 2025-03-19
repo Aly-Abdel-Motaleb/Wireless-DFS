@@ -33,6 +33,13 @@ func main() {
 		}
 	}()
 
+	go func() {
+		for {
+			masterServer.ReplicateFiles()
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
 	err = grpc_server.Serve(lis)
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)

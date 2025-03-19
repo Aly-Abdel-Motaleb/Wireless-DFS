@@ -4,6 +4,7 @@ import (
 	pb "DFS/dfs"
 	tcp "DFS/tcp"
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -28,7 +29,7 @@ func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileReq
 	for i, _ := range in.Ids {
 		conn, err := grpc.Dial(in.Ips[i]+":"+in.Ports[i], grpc.WithInsecure())
 		if err != nil {
-			log.Fatalf("Failed to dial datakeeper: %v", err)
+			return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to connect to %v", in.Ips[i])}, nil
 		}
 		defer conn.Close()
 		client := pb.NewDataKeeperClient(conn)
@@ -36,20 +37,20 @@ func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileReq
 		// return the ip and port for the tcp connections
 		resp, err := client.RequestUpload(context.Background(), request)
 		if err != nil {
-			return nil, err
+			return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to request upload from %v", in.Ips[i])}, nil
 		}
 		tcpConn, err := net.Dial("tcp", resp.Ip+":"+resp.Port)
 		if err != nil {
-			return nil, err
+			return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to connect to %v", in.Ips[i])}, nil
 		}
 		defer tcpConn.Close()
 		err = tcp.SendFile(tcpConn, in.FilePath)
 		if err != nil {
-			return nil, err
+			return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to replicate file to %v", in.Ips[i])}, nil
 		}
 	}
 
-	return nil, nil
+	return &pb.Ack{Success: true, Message: fmt.Sprintf("File replicated to %v datakeepers", len(in.Ids))}, nil
 }
 
 func (dk *DataKeeper) Heartbeat() {

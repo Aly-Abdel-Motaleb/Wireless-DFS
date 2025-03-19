@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -39,12 +40,31 @@ func main() {
 		}
 	}
 
-	if len(os.Args) == 3 {
-		if os.Args[1] == "upload" {
+	switch os.Args[1] {
+	case "upload":
+		if len(os.Args) < 3 {
 			uploadFile(os.Args[2])
-		} else if os.Args[1] == "download" {
-			downloadFile(os.Args[2], func() {})
+		} else {
+			log.Println("Usage: go run main.go upload <file_path>")
 		}
+	case "download":
+		if len(os.Args) < 3 {
+			downloadFile(os.Args[2], func() {})
+		} else {
+			log.Println("Usage: go run main.go upload <file_path>")
+		}
+	case "list":
+		files, err := listFiles()
+		fmt.Printf("%-20s %-10s\n", "Name", "Size")
+		for _, file := range files {
+			if err != nil {
+				log.Printf("Error listing files: %v", err)
+				continue
+			}
+			fmt.Printf("%-20s %-.2f MB\n", file.Name, float64(file.Size)/(1024*1024))
+		}
+	default:
+		log.Println("Invalid command.")
 	}
 }
 
@@ -96,16 +116,26 @@ func uploadFile(filePath string) {
 	log.Println("Upload successful.")
 }
 
-func listFiles(app *tview.Application) {
+func listFiles() ([]*pb.FileDetails, error) {
 	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Println("Failed to connect to Master Tracker:", err)
-		return
+		return nil, err
 	}
 	defer conn.Close()
 
 	client := pb.NewMasterTrackerClient(conn)
 	resp, err := client.ListFiles(context.Background(), &pb.EmptyRequest{})
+	if err != nil {
+		log.Println("Failed to list files:", err)
+		return nil, err
+	}
+
+	return resp.FileDetails, nil
+}
+
+func listFilesTui(app *tview.Application) {
+	files, err := listFiles()
 	if err != nil {
 		log.Println("Failed to list files:", err)
 		return
@@ -116,7 +146,7 @@ func listFiles(app *tview.Application) {
 	listView.SetMainTextStyle(defaultStyle)
 	listView.SetShortcutStyle(defaultStyle)
 
-	for _, file := range resp.FileDetails {
+	for _, file := range files {
 		fileName := file.Name
 		listView.AddItem(fileName, "", 0, func() {
 			go downloadFile(fileName, func() {
@@ -181,7 +211,7 @@ func mainMenu(app *tview.Application) *tview.List {
 	menu.SetShortcutStyle(defaultStyle)
 
 	menu.AddItem("Upload File", "", 'u', func() { promptFileUpload(app) })
-	menu.AddItem("Download File", "", 'd', func() { listFiles(app) })
+	menu.AddItem("Download File", "", 'd', func() { listFilesTui(app) })
 	menu.AddItem("Exit", "", 'q', func() { app.Stop() })
 	return menu
 }
