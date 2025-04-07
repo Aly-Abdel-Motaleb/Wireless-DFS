@@ -53,7 +53,7 @@
         \begin{TAB}(v,1cm,1cm)[5pt]{|l|l|l|l|}{|c|c|c|c|c|}% (rows,min,max)[tabcolsep]{columns}{rows}
         \textbf{ID} & \textbf{Name} & \textbf{Sec} & \textbf{BN} \\
         9210684 & Ali Mohamed Farid & 1 & 25 \\
-        9213035 & Waleed Ousama Khamees & 2 & 31 \\
+        9213035 & Waleed Ousama Khamees & 2 & 30 \\
         9213347 & Mohamed Maher Hasan Amin & 2 & 12 \\
         9211164 & Mostafa Elsayed & 2 & 20 \\
         \end{TAB}
@@ -94,14 +94,18 @@ The project is organized into several key directories and files:
 
     \item \textbf{master/}
     \begin{itemize}
-        \item \texttt{main.go}: Initializes the MasterTracker service, starts the gRPC server, and periodically updates the status of DataKeepers.
-        \item \texttt{server.go}: Implements the core logic for the MasterTracker service, including methods for coordinating file uploads, downloads, and replication.
+        \item \texttt{main.go}: Initializes the MasterTracker service,
+          \\ starts the gRPC server, and periodically updates the status of DataKeepers.
+        \item \texttt{server.go}: Implements the core logic for the 
+          \\ MasterTracker service, including methods for 
+          \\ coordinating file uploads, downloads, and replication.
         \item \texttt{db.go}: Has database initialization logic and table definitions.
     \end{itemize}
 
     \item \textbf{utils/}
     \begin{itemize}
-        \item \texttt{hash.go}: Provides utility functions, such as \texttt{HashFileSHA256},
+        \item \texttt{hash.go}: Provides utility functions, such as 
+          \\ \texttt{HashFileSHA256},
         computes the hash of a file to prevent data duplication.
     \end{itemize}
 
@@ -127,12 +131,13 @@ The project is organized into several key directories and files:
             It returns the IP and port of the DataKeeper to upload the file to.
             The client can then upload the file to this DataKeeper.
             \item \texttt{requestDownload}:
-            Clients use this method to request file downloads.
-            It returns the IPs and ports of the DataKeepers storing the file.
-            The client can then download the file from any of these DataKeepers.
+            Clients use this method to request file 
+            \\ downloads. It returns the IPs and ports of the DataKeepers
+            \\ storing the file. The client can then download the file from
+            \\ any of these DataKeepers.
             \item \texttt{heartbeat}:
-            DataKeepers use this method to send periodic heartbeats to the MasterTracker.
-            The Request contains the IP, ID, and port of the DataKeeper.
+            DataKeepers use this method to send periodic
+            \\ heartbeats to the MasterTracker. The Request contains the IP, ID, and port of the DataKeeper.
             \item \texttt{notifyFileStored}:
             DataKeepers use this method to notify the MasterTracker when a file has been successfully stored.
             \item \texttt{ListFiles}:
@@ -143,8 +148,10 @@ The project is organized into several key directories and files:
         \item \textbf{DataKeeper Service:}
         \begin{itemize}
             \item \texttt{replicateFile}:
-            Master uses this method to request file replication.
-            The request sent to the DataKeeper contains the file name and the IPs and ports of the DataKeepers to replicate the file to.
+            Master uses this method to request file
+            \\ replication. The request sent to the DataKeeper contains the
+            \\ file name and the IPs and ports of the DataKeepers to replicate
+            \\ the file to.
             \item \texttt{requestUpload}:
             Master uses this method to request file uploads.
             It opens a random port on the DataKeeper and returns the IP and port to the Master.
