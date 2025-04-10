@@ -2,6 +2,7 @@ package main
 
 import (
 	"DFS/master/db"
+	"flag"
 	"log"
 	"net"
 	"time"
@@ -13,9 +14,11 @@ import (
 )
 
 func main() {
+	ip := flag.String("ip", "localhost:50051", "Master IP")
+
 	db.InitDb()
 
-	lis, err := net.Listen("tcp", "localhost:50051")
+	lis, err := net.Listen("tcp", *ip)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

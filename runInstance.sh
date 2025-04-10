@@ -1,5 +1,7 @@
 #!/bin/bash
 
+myip="192.168.1.15"
+
 # Kill any existing processes running on the required ports
 kill_ports() {
   ports=("50051" "50052" "50053" "50054")
@@ -12,7 +14,7 @@ kill_ports() {
 start_master() {
   echo "Starting Master server..."
   pushd master > /dev/null
-  go run main.go &
+  go run main.go -ip="$myip:50051" &
   MASTER_PID=$!
   popd > /dev/null
 }
@@ -23,7 +25,7 @@ start_datakeeper() {
   local port=$2
   echo "Starting DataKeeper $id on port $port..."
   pushd datakeeper > /dev/null
-  go run main.go -i="$id" -ip="localhost" -p="$port" -m="localhost:50051" &
+  go run main.go -i="$id" -ip="$myip" -p="$port" -m="$myip:50051" &
   eval "DK${id}_PID=$!"
   popd > /dev/null
 }
@@ -36,7 +38,7 @@ sleep 2 # Allow Master server to initialize
 
 start_datakeeper 1 50052
 start_datakeeper 2 50053
-start_datakeeper 3 50054
+# start_datakeeper 3 50054
 
 echo "All servers are running."
 echo "Master PID: $MASTER_PID"
