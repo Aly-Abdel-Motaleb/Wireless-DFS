@@ -1,3 +1,4 @@
 **/*.ignore
 **/*.mp4
 **/*.db
+**/**/datakeeper_*

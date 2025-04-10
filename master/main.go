@@ -2,23 +2,40 @@ package main
 
 import (
 	"DFS/master/db"
-	"flag"
+	"DFS/master/server"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	pb "DFS/dfs"
-	"DFS/master/server"
 
 	"google.golang.org/grpc"
 )
 
 func main() {
-	ip := flag.String("ip", "localhost:50051", "Master IP")
+	ip := ""
+	port := ":50051"
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.Fatalf("failed to get interface addresses: %v", err)
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if addr.String()[0:7] == "192.168" {
+				ip = strings.Split(addr.String(), "/")[0]
+				break
+			}
+		}
+	}
+	ip = ip + port
+
+	log.Printf("Master server is starting at %s\n", ip)
 
 	db.InitDb()
 
-	lis, err := net.Listen("tcp", *ip)
+	lis, err := net.Listen("tcp", ip)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -26,8 +43,6 @@ func main() {
 	grpc_server := grpc.NewServer()
 	masterServer := server.NewMasterServer()
 	pb.RegisterMasterTrackerServer(grpc_server, masterServer)
-
-	log.Println("Starting Master Server on localhost:50051")
 
 	go func() {
 		for {
