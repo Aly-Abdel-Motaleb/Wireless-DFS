@@ -15,21 +15,34 @@ import (
 )
 
 func main() {
+	ip := ""
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.Fatalf("failed to get interface addresses: %v", err)
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ip4 := ipnet.IP.To4(); ip4 != nil {
+				ip = ip4.String()
+				break
+			}
+		}
+	}
 
 	id := flag.String("i", "1", "Datakeeper ID")
-	ip := flag.String("ip", "localhost", "Datakeeper IP")
-	port := flag.String("p", "50052", "Datakeeper Port")
-	MasterAddr := flag.String("m", "localhost:50051", "Master Address")
+	port := *flag.String("p", "50052", "Datakeeper Port")
+	MasterAddr := *flag.String("m", "192.168.1.15:50051", "Master Address")
 
 	flag.Parse()
 
 	ipRegex := `\b((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b|\b(?:localhost)\b`
-	matched, err := regexp.MatchString(ipRegex, *ip)
+	matched, err := regexp.MatchString(ipRegex, ip)
 	if err != nil || !matched {
-		log.Fatalf("invalid IP address: %v", *ip)
+		log.Fatalf("invalid IP address: %v", ip)
 	}
 
-	if *ip == "" || *port == "" {
+	if ip == "" || port == "" {
 		log.Fatalf("IP address and port must not be empty")
 	}
 
@@ -38,18 +51,18 @@ func main() {
 		log.Printf("Failed to create directory: %v", err)
 	}
 
-	lis, err := net.Listen("tcp", *ip+":"+*port)
+	lis, err := net.Listen("tcp", ip+":"+port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
 	grpc_server := grpc.NewServer()
 
-	dk := server.NewDataKeeperServer(*id, *ip, *port, *MasterAddr)
+	dk := server.NewDataKeeperServer(*id, ip, port, MasterAddr)
 
 	pb.RegisterDataKeeperServer(grpc_server, dk)
 
-	log.Println("Starting Datakeeper Server on " + *ip + ":" + *port)
+	log.Println("Starting Datakeeper Server on " + ip + ":" + port)
 
 	go func() {
 		for {

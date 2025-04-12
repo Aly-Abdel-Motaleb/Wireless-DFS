@@ -16,8 +16,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// const masterTrackerAddr = "192.168.1.15:50051"
-
 var bgColor = tcell.NewHexColor(0x1d1f21)
 var defaultStyle = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(bgColor)
 
