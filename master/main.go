@@ -3,6 +3,7 @@ package main
 import (
 	"DFS/master/db"
 	"DFS/master/server"
+	"DFS/utils"
 	"flag"
 	"log"
 	"net"
@@ -14,8 +15,13 @@ import (
 )
 
 func main() {
-	ip := ""
+	ip, err := utils.GetIP()
+	if err != nil {
+		log.Fatalf("failed to get IP address: %v", err)
+	}
+
 	port := *flag.String("p", ":50051", "Master Port")
+
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Fatalf("failed to get interface addresses: %v", err)

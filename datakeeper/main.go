@@ -3,6 +3,7 @@ package main
 import (
 	"DFS/datakeeper/server"
 	pb "DFS/dfs"
+	"DFS/utils"
 	"flag"
 	"fmt"
 	"log"
@@ -15,21 +16,9 @@ import (
 )
 
 func main() {
-	ip := ""
-	addrs, err := net.InterfaceAddrs()
+	ip, err := utils.GetIP()
 	if err != nil {
-		log.Fatalf("failed to get interface addresses: %v", err)
-	}
-
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ip4 := ipnet.IP.To4(); ip4 != nil {
-				ip = ip4.String()
-				if ip[0:3] == "192" {
-					break
-				}
-			}
-		}
+		log.Fatalf("failed to get IP address: %v", err)
 	}
 
 	id := flag.String("i", "1", "Datakeeper ID")
