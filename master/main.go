@@ -5,7 +5,6 @@ import (
 	"DFS/master/server"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	pb "DFS/dfs"
@@ -23,9 +22,8 @@ func main() {
 
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if addr.String()[0:7] == "192.168" {
-				ip = strings.Split(addr.String(), "/")[0]
-				break
+			if ip4 := ipnet.IP.To4(); ip4 != nil {
+				ip = ip4.String()
 			}
 		}
 	}

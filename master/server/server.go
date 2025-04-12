@@ -113,6 +113,7 @@ func (s *MasterServer) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) 
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("Heartbeat recieved from datakeeper %s", req.Id)
 
 	return &pb.Ack{Success: true, Message: "Heartbeat received"}, nil
 }

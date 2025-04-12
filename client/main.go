@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -15,16 +16,18 @@ import (
 	"google.golang.org/grpc"
 )
 
-const masterTrackerAddr = "192.168.1.15:50051"
+// const masterTrackerAddr = "192.168.1.15:50051"
 
 var bgColor = tcell.NewHexColor(0x1d1f21)
 var defaultStyle = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(bgColor)
 
 func main() {
+	masterTrackerAddr := *flag.String("m", "localhost:50051", "Master Tracker Address")
+
 	log.Printf("Args: %v", os.Args)
 	if len(os.Args) == 1 {
 		app := tview.NewApplication()
-		menu := mainMenu(app)
+		menu := mainMenu(masterTrackerAddr, app)
 		if err := app.SetRoot(menu, true).Run(); err != nil {
 			log.Fatalf("Error running TUI: %v", err)
 		}
@@ -33,7 +36,7 @@ func main() {
 	switch os.Args[1] {
 	case "upload":
 		if len(os.Args) <= 3 {
-			uploadFile(os.Args[2], func(message string) {
+			uploadFile(masterTrackerAddr, os.Args[2], func(message string) {
 				log.Println(message)
 			})
 		} else {
@@ -41,12 +44,12 @@ func main() {
 		}
 	case "download":
 		if len(os.Args) <= 3 {
-			downloadFile(os.Args[2], func() {})
+			downloadFile(masterTrackerAddr, os.Args[1], func() {})
 		} else {
 			log.Println("Usage: go run main.go upload <file_path>")
 		}
 	case "list":
-		files, err := listFiles()
+		files, err := listFiles(masterTrackerAddr)
 		fmt.Printf("%-20s %-10s\n", "Name", "Size")
 		for _, file := range files {
 			if err != nil {
@@ -60,7 +63,7 @@ func main() {
 	}
 }
 
-func promptFileUpload(app *tview.Application) {
+func promptFileUpload(masterTrackerAddr string, app *tview.Application) {
 	input := tview.NewInputField()
 
 	input.SetBackgroundColor(bgColor)
@@ -72,13 +75,13 @@ func promptFileUpload(app *tview.Application) {
 		if key == tcell.KeyEnter {
 			filePath := input.GetText()
 			func() {
-				go uploadFile(filePath, func(message string) {
+				go uploadFile(masterTrackerAddr, filePath, func(message string) {
 					app.QueueUpdateDraw(func() {
 						modal := tview.NewModal().
 							SetText(message).
 							AddButtons([]string{"OK"}).
 							SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-								app.SetRoot(mainMenu(app), true)
+								app.SetRoot(mainMenu(masterTrackerAddr, app), true)
 							})
 						app.SetRoot(modal, true)
 					})
@@ -90,7 +93,7 @@ func promptFileUpload(app *tview.Application) {
 	app.SetRoot(input, true).SetFocus(input)
 }
 
-func uploadFile(filePath string, finish func(string)) {
+func uploadFile(masterTrackerAddr string, filePath string, finish func(string)) {
 
 	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
 	if err != nil {
@@ -131,7 +134,7 @@ func uploadFile(filePath string, finish func(string)) {
 	}
 }
 
-func listFiles() ([]*pb.FileDetails, error) {
+func listFiles(masterTrackerAddr string) ([]*pb.FileDetails, error) {
 	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Println("Failed to connect to Master Tracker:", err)
@@ -148,8 +151,8 @@ func listFiles() ([]*pb.FileDetails, error) {
 
 	return resp.FileDetails, nil
 }
-func listFilesTui(app *tview.Application) {
-	files, err := listFiles()
+func listFilesTui(masterTrackerAddr string, app *tview.Application) {
+	files, err := listFiles(masterTrackerAddr)
 	if err != nil {
 		log.Println("Failed to list files:", err)
 		return
@@ -163,7 +166,7 @@ func listFilesTui(app *tview.Application) {
 	for _, file := range files {
 		fileName := file.Name
 		listView.AddItem(fileName, "", 0, func() {
-			go downloadFile(fileName, func() {
+			go downloadFile(masterTrackerAddr, fileName, func() {
 				app.QueueUpdateDraw(func() {
 					modal := tview.NewModal().
 						SetText("Download completed successfully!").
@@ -176,11 +179,11 @@ func listFilesTui(app *tview.Application) {
 			})
 		})
 	}
-	listView.AddItem("Back", "", 'b', func() { app.SetRoot(mainMenu(app), true) })
+	listView.AddItem("Back", "", 'b', func() { app.SetRoot(mainMenu(masterTrackerAddr, app), true) })
 	app.SetRoot(listView, true)
 }
 
-func downloadFile(fileName string, reportSuccess func()) {
+func downloadFile(masterTrackerAddr string, fileName string, reportSuccess func()) {
 	conn, err := grpc.Dial(masterTrackerAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Println("Failed to connect to Master Tracker:", err)
@@ -216,15 +219,15 @@ func downloadFile(fileName string, reportSuccess func()) {
 	}
 }
 
-func mainMenu(app *tview.Application) *tview.List {
+func mainMenu(masterTrackerAddr string, app *tview.Application) *tview.List {
 	menu := tview.NewList().ShowSecondaryText(false)
 
 	menu.SetMainTextStyle(defaultStyle)
 	menu.SetBackgroundColor(bgColor)
 	menu.SetShortcutStyle(defaultStyle)
 
-	menu.AddItem("Upload File", "", 'u', func() { promptFileUpload(app) })
-	menu.AddItem("Download File", "", 'd', func() { listFilesTui(app) })
+	menu.AddItem("Upload File", "", 'u', func() { promptFileUpload(masterTrackerAddr, app) })
+	menu.AddItem("Download File", "", 'd', func() { listFilesTui(masterTrackerAddr, app) })
 	menu.AddItem("Exit", "", 'q', func() { app.Stop() })
 	return menu
 }
