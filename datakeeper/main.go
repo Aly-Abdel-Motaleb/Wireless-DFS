@@ -25,7 +25,9 @@ func main() {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ip4 := ipnet.IP.To4(); ip4 != nil {
 				ip = ip4.String()
-				break
+				if ip[0:3] == "192" {
+					break
+				}
 			}
 		}
 	}
