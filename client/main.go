@@ -20,34 +20,45 @@ var bgColor = tcell.NewHexColor(0x1d1f21)
 var defaultStyle = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(bgColor)
 
 func main() {
-	masterTrackerAddr := *flag.String("m", "localhost:50051", "Master Tracker Address")
+	masterTrackerAddr := flag.String("m", "", "Master Tracker Address")
+	command := flag.String("c", "", "Command to execute (upload/download/list)")
+	filePath := flag.String("f", "", "File path for upload/download")
 
-	log.Printf("Args: %v", os.Args)
-	if len(os.Args) == 1 {
-		app := tview.NewApplication()
-		menu := mainMenu(masterTrackerAddr, app)
-		if err := app.SetRoot(menu, true).Run(); err != nil {
-			log.Fatalf("Error running TUI: %v", err)
-		}
+	flag.Parse()
+
+	if *masterTrackerAddr == "" || *command == "" {
+		log.Fatal("Usage : -m <master_tracker_address> -c <command> [-f <file_path>]")
 	}
 
-	switch os.Args[1] {
-	case "upload":
-		if len(os.Args) <= 3 {
-			uploadFile(masterTrackerAddr, os.Args[2], func(message string) {
-				log.Println(message)
-			})
-		} else {
-			log.Println("Usage: go run main.go upload <file_path>")
+	switch *command {
+	case "upload", "u", "download", "d":
+		if *filePath == "" {
+			log.Fatal("File path is required for upload/download commands.")
 		}
-	case "download":
-		if len(os.Args) <= 3 {
-			downloadFile(masterTrackerAddr, os.Args[1], func() {})
-		} else {
-			log.Println("Usage: go run main.go upload <file_path>")
-		}
-	case "list":
-		files, err := listFiles(masterTrackerAddr)
+	case "list", "l":
+		// no filePath required — all good
+	default:
+		log.Fatalf("Invalid command: %s. Allowed: upload/u, download/d, list/l", *command)
+	}
+
+	log.Printf("Args: %v", os.Args)
+	// if len(os.Args) == 1 {
+	// 	app := tview.NewApplication()
+	// 	menu := mainMenu(masterTrackerAddr, app)
+	// 	if err := app.SetRoot(menu, true).Run(); err != nil {
+	// 		log.Fatalf("Error running TUI: %v", err)
+	// 	}
+	// }
+
+	switch *command {
+	case "upload", "u":
+		uploadFile(*masterTrackerAddr, *filePath, func(message string) {
+			log.Println(message)
+		})
+	case "download", "d":
+		downloadFile(*masterTrackerAddr, *filePath, func() {})
+	case "list", "l":
+		files, err := listFiles(*masterTrackerAddr)
 		fmt.Printf("%-20s %-10s\n", "Name", "Size")
 		for _, file := range files {
 			if err != nil {
@@ -192,7 +203,7 @@ func downloadFile(masterTrackerAddr string, fileName string, reportSuccess func(
 	client := pb.NewMasterTrackerClient(conn)
 	resp, err := client.RequestDownload(context.Background(), &pb.DownloadRequest{FileName: fileName})
 	if err != nil {
-		log.Println("Failed to get Data Keeper nodes:", err)
+		log.Printf("Error: %v", err)
 		return
 	}
 

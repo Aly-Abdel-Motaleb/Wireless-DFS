@@ -183,7 +183,7 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		return
 	}
 
-	filePath := fmt.Sprintf("%s/%s", dirPath, filename)
+	filePath := filepath.Join(dirPath, filename)
 
 	_, err := os.Stat(filePath)
 	if err == nil {
@@ -192,7 +192,7 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		counter := 1
 		for {
 			newFilename := fmt.Sprintf("%s_%d%s", base, counter, ext)
-			newFilePath := fmt.Sprintf("%s/%s", dirPath, newFilename)
+			newFilePath := filepath.Join(dirPath, newFilename)
 			if _, err := os.Stat(newFilePath); os.IsNotExist(err) {
 				filename = newFilename
 				filePath = newFilePath
@@ -202,7 +202,7 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		}
 	}
 
-	tempFilePath := fmt.Sprintf("%s/temp", dirPath)
+	tempFilePath := filepath.Join(dirPath, "temp")
 
 	err = os.MkdirAll(tempFilePath, 0755)
 	if err != nil && !os.IsExist(err) {
@@ -212,7 +212,7 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		return
 	}
 
-	file, err := os.Create(fmt.Sprintf("%s/%s", tempFilePath, filename))
+	file, err := os.Create(filepath.Join(tempFilePath, filename))
 	if err != nil {
 		log.Println("Error creating file:", err)
 		exit <- true
@@ -261,18 +261,20 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 		return
 	}
 
-	hash, err := utils.HashFileSHA256(fmt.Sprintf("%s/%s", tempFilePath, filename))
+	hash, err := utils.HashFileSHA256(filepath.Join(tempFilePath, filename))
 	if err != nil {
 		log.Println("Failed to hash file:", err)
 		exit <- true
 		close(exit)
-		_ = os.Remove(fmt.Sprintf("%s/%s", tempFilePath, filename))
+		_ = os.Remove(filepath.Join(tempFilePath, filename))
 		return
 	}
 
-	_ = os.Rename(fmt.Sprintf("%s/%s", tempFilePath, filename), filePath)
+	file.Close()
 
-	_ = os.Remove(tempFilePath)
+	_ = os.Rename(filepath.Join(tempFilePath, filename), filePath)
+
+	_ = os.RemoveAll(tempFilePath)
 
 	fileDetails := NewFileDetails(filename, &hash, &filePath, &fileSize)
 
