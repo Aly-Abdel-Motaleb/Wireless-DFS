@@ -46,6 +46,7 @@ func (dk *DataKeeper) ReplicateFile(ctx context.Context, in *pb.ReplicateFileReq
 		defer tcpConn.Close()
 		err = tcp.SendFile(tcpConn, in.FilePath)
 		if err != nil {
+			fmt.Printf(err.Error())
 			return &pb.Ack{Success: false, Message: fmt.Sprintf("Failed to replicate file to %v", in.Ips[i])}, nil
 		}
 	}

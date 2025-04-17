@@ -11,7 +11,7 @@ var DB *sql.DB
 
 func InitDb() {
 	var err error
-	DB, err = sql.Open("sqlite3", "db.db")
+	DB, err = sql.Open("sqlite3", "file:db.db?_busy_timeout=5000&_journal_mode=WAL")
 	if err != nil {
 		panic(err)
 	}

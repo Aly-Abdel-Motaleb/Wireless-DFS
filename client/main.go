@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	pb "DFS/dfs"
 	"DFS/tcp"
@@ -125,22 +126,22 @@ func uploadFile(masterTrackerAddr string, filePath string, finish func(string)) 
 	}
 	defer tcpConn.Close()
 
-	err = tcp.SendFile(tcpConn, filePath)
-	if err != nil {
-		message := fmt.Sprintf("File upload failed: %v", err)
-		finish(message)
+	go tcp.SendFile(tcpConn, filePath)
+
+	x := 0
+	for {
+		ack, err := client.DoesFileExist(context.Background(), &pb.DownloadRequest{FileName: filePath})
+		if err != nil {
+			message := fmt.Sprintf("File upload failed: %v", err)
+			finish(message)
+		}
+		if (ack != nil && ack.Success) || x == 30 {
+			break
+		}
+		time.Sleep(10 * time.Second)
+		x += 1
 	}
 
-	ack, err := client.DoesFileExist(context.Background(), &pb.DownloadRequest{FileName: filePath})
-	if err != nil {
-		message := fmt.Sprintf("File upload failed: %v", err)
-		finish(message)
-	}
-
-	if ack != nil && ack.Success {
-		message := "File uploaded successfully."
-		finish(message)
-	}
 }
 
 func listFiles(masterTrackerAddr string) ([]*pb.FileDetails, error) {

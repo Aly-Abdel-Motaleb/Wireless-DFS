@@ -210,7 +210,7 @@ func (s *MasterServer) DoesFileExist(ctx context.Context, req *pb.DownloadReques
 func (s *MasterServer) UpdateDataKeepersAliveStatus() {
 	_, err := db.DB.Exec("UPDATE datakeepers SET is_alive = 0 where last_heartbeat < datetime('now', '-10 seconds');")
 	if err != nil {
-		log.Fatalf("Cannot update datakeepers alive status: %v", err)
+		log.Printf("Cannot update datakeepers alive status: %v", err)
 	}
 }
 

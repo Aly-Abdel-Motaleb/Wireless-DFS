@@ -22,10 +22,16 @@ func main() {
 	}
 
 	id := flag.String("i", "1", "Datakeeper ID")
-	port := *flag.String("p", "50052", "Datakeeper Port")
-	MasterAddr := *flag.String("m", "192.168.1.15:50051", "Master Address")
+	portFlag := flag.String("p", "50052", "Datakeeper Port")
+	MasterAddrFlag := flag.String("m", "192.168.1.15:50051", "Master Address")
 
 	flag.Parse()
+
+	fmt.Printf("Datakeeper ID: %s\n", *id)
+	fmt.Printf("Datakeeper Port: %s\n", *portFlag)
+
+	port := *portFlag
+	MasterAddr := *MasterAddrFlag
 
 	ipRegex := `\b((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b|\b(?:localhost)\b`
 	matched, err := regexp.MatchString(ipRegex, ip)

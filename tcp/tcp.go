@@ -274,7 +274,7 @@ func ReceiveFile(conn net.Conn, exit chan bool, ch chan FileDetails, id string, 
 
 	_ = os.Rename(filepath.Join(tempFilePath, filename), filePath)
 
-	_ = os.RemoveAll(tempFilePath)
+	// _ = os.RemoveAll(tempFilePath)
 
 	fileDetails := NewFileDetails(filename, &hash, &filePath, &fileSize)
 
